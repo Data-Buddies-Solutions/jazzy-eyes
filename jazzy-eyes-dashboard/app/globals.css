@@ -1,0 +1,70 @@
+@import "tailwindcss";
+
+@theme {
+  /* Light blue theme - using sky-soft and sky-deeper colors */
+  --color-background: #fafafa;
+  --color-foreground: #1a202c;
+
+  --color-card: #ffffff;
+  --color-card-foreground: #1a202c;
+
+  --color-popover: #ffffff;
+  --color-popover-foreground: #1a202c;
+
+  --color-primary: #87ceeb; /* sky-deeper */
+  --color-primary-foreground: #1a202c; /* black text on blue buttons */
+
+  --color-secondary: #c1f1ff; /* sky-soft */
+  --color-secondary-foreground: #1a202c;
+
+  --color-muted: #f7fafc;
+  --color-muted-foreground: #718096;
+
+  --color-accent: #c1f1ff; /* sky-soft */
+  --color-accent-foreground: #1a202c;
+
+  --color-destructive: #ef4444; /* error */
+  --color-destructive-foreground: #ffffff;
+
+  --color-border: #e2e8f0;
+  --color-input: #e2e8f0;
+  --color-ring: #87ceeb; /* sky-deeper for focus rings */
+
+  /* Custom colors */
+  --color-sky-soft: #c1f1ff;
+  --color-sky-deeper: #87ceeb;
+  --color-neutral: #c1f1ff;
+  --color-success: #10b981;
+  --color-error: #ef4444;
+  --color-warning: #f59e0b;
+
+  --radius: 0.5rem;
+}
+
+@layer base {
+  :root {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-feature-settings: 'tnum';
+  }
+
+  body {
+    @apply bg-[#FAFAFA] text-gray-900 antialiased;
+  }
+}
+
+@layer utilities {
+  .animate-counter {
+    animation: counter 0.8s ease-out;
+  }
+
+  @keyframes counter {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
