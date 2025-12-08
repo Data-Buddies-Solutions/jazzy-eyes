@@ -115,8 +115,8 @@ export function FrameTable({
                   {frame.frameId}
                 </TableCell>
                 <TableCell>{frame.brand}</TableCell>
-                <TableCell>{frame.model}</TableCell>
-                <TableCell>{frame.color}</TableCell>
+                <TableCell>{frame.styleNumber}</TableCell>
+                <TableCell>{frame.colorCode}</TableCell>
                 <TableCell>{frame.frameType}</TableCell>
                 <TableCell>{getStatusBadge(frame.status)}</TableCell>
                 <TableCell className="text-right font-semibold">

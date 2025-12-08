@@ -1,14 +1,16 @@
 import { z } from 'zod';
 
 export const frameFormSchema = z.object({
-  brand: z.string().min(1, 'Brand is required'),
-  model: z.string().min(1, 'Model is required'),
-  color: z.string().min(1, 'Color is required'),
+  brandId: z.coerce.number().int().positive('Brand is required'),
+  styleNumber: z.string().min(1, 'Style number is required'),
+  colorCode: z.string().min(1, 'Color code is required'),
+  eyeSize: z.string().min(1, 'Eye size is required'),
   gender: z.enum(['Men', 'Women', 'Unisex']),
-  frameType: z.enum(['Optical', 'Sunglasses']),
+  frameType: z.enum(['Zyl', 'Metal', 'Rimless']),
+  productType: z.enum(['Optical', 'Sunglasses']),
+  invoiceDate: z.string().optional(),
   costPrice: z.coerce.number().nonnegative("Cost price can't be negative"),
   retailPrice: z.coerce.number().nonnegative("Retail price can't be negative"),
-  supplier: z.string().min(1, 'Supplier is required'),
   notes: z.string().optional(),
 });
 

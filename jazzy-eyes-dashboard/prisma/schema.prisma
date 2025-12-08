@@ -1,6 +1,3 @@
-// This is your Prisma schema file
-// Learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,80 +7,62 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ============================================
-// BRANDS TABLE
-// ============================================
-// Stores parent companies and their brand portfolio
 model Brand {
-  id                  Int       @id // Brand ID (1001, 1002, etc.)
-  companyName         String    @map("company_name") @db.VarChar(255)
-  companyId           Int       @map("company_id") // Company ID (1000, 2000, etc.)
-  brandName           String    @unique @map("brand_name") @db.VarChar(255)
-  allocationQuantity  Int       @map("allocation_quantity") // ALLO - Standing inventory target
-  discountPercentage  Decimal   @map("discount_percentage") @db.Decimal(5, 2) // To be collected manually
-  createdAt           DateTime  @default(now()) @map("created_at")
-  updatedAt           DateTime  @updatedAt @map("updated_at")
-
-  // Relations
-  products            Product[]
+  id                 Int       @id
+  companyName        String    @map("company_name") @db.VarChar(255)
+  companyId          Int       @map("company_id")
+  brandName          String    @unique @map("brand_name") @db.VarChar(255)
+  allocationQuantity Int       @map("allocation_quantity")
+  discountPercentage Decimal   @map("discount_percentage") @db.Decimal(5, 2)
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  products           Product[]
 
   @@map("brands")
 }
 
-// ============================================
-// PRODUCTS TABLE
-// ============================================
-// Defines unique product variants (style + color + size combinations)
 model Product {
-  compositeId         String                   @id @map("composite_id") @db.VarChar(255) // Format: {brand_id}-{style_number}-{color_code}-{eye_size}
-  brandId             Int                      @map("brand_id")
-  styleNumber         String                   @map("style_number") @db.VarChar(100)
-  colorCode           String                   @map("color_code") @db.VarChar(50)
-  eyeSize             String                   @map("eye_size") @db.VarChar(20)
-  gender              String                   @db.VarChar(20) // Men/Women/Uni
-  frameType           String                   @map("frame_type") @db.VarChar(50) // Zyl/Metal/Rimless
-  productType         String                   @map("product_type") @db.VarChar(20) // Sun/Opth
-  createdAt           DateTime                 @default(now()) @map("created_at")
-  updatedAt           DateTime                 @updatedAt @map("updated_at")
-
-  // Relations
-  brand               Brand                    @relation(fields: [brandId], references: [id], onUpdate: Cascade, onDelete: Restrict)
-  transactions        InventoryTransaction[]
+  compositeId  String                 @id @map("composite_id") @db.VarChar(255)
+  brandId      Int                    @map("brand_id")
+  styleNumber  String                 @map("style_number") @db.VarChar(100)
+  colorCode    String                 @map("color_code") @db.VarChar(50)
+  eyeSize      String                 @map("eye_size") @db.VarChar(20)
+  gender       String                 @db.VarChar(20)
+  frameType    String                 @map("frame_type") @db.VarChar(50)
+  productType  String                 @map("product_type") @db.VarChar(20)
+  createdAt    DateTime               @default(now()) @map("created_at")
+  updatedAt    DateTime               @updatedAt @map("updated_at")
+  transactions InventoryTransaction[]
+  brand        Brand                  @relation(fields: [brandId], references: [id])
 
   @@index([brandId])
   @@index([styleNumber])
   @@map("products")
 }
 
-// ============================================
-// INVENTORY_TRANSACTIONS TABLE
-// ============================================
-// Records all inventory movements (orders and sales) with full transaction history
 model InventoryTransaction {
-  id                  Int                      @id @default(autoincrement())
-  productId           String                   @map("product_id") @db.VarChar(255)
-  transactionType     TransactionType          @map("transaction_type")
-  transactionDate     DateTime                 @map("transaction_date") @db.Date
-  quantity            Int                      // Always positive
-  unitCost            Decimal                  @map("unit_cost") @db.Decimal(10, 2) // For orders
-  unitPrice           Decimal                  @map("unit_price") @db.Decimal(10, 2) // For sales
-  status              String                   @default("completed") @db.VarChar(50) // pending/completed/cancelled
-  notes               String?                  @db.Text
-  createdAt           DateTime                 @default(now()) @map("created_at")
-  updatedAt           DateTime                 @updatedAt @map("updated_at")
-
-  // Relations
-  product             Product                  @relation(fields: [productId], references: [compositeId], onUpdate: Cascade, onDelete: Restrict)
+  id              Int             @id @default(autoincrement())
+  productId       String          @map("product_id") @db.VarChar(255)
+  transactionType TransactionType @map("transaction_type")
+  transactionDate DateTime        @map("transaction_date") @db.Date
+  invoiceDate     DateTime?       @map("invoice_date") @db.Date
+  invoiceNumber   String?         @map("invoice_number") @db.VarChar(100)
+  quantity        Int
+  unitCost        Decimal         @map("unit_cost") @db.Decimal(10, 2)
+  unitPrice       Decimal         @map("unit_price") @db.Decimal(10, 2)
+  status          String          @default("completed") @db.VarChar(50)
+  notes           String?
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+  product         Product         @relation(fields: [productId], references: [compositeId])
 
   @@index([productId])
   @@index([transactionDate])
   @@index([transactionType])
+  @@index([invoiceDate])
   @@map("inventory_transactions")
 }
 
-// ============================================
-// ENUMS
-// ============================================
 enum TransactionType {
   ORDER
   SALE

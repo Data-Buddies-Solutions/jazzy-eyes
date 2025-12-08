@@ -19,12 +19,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { FrameForm } from '@/components/admin/FrameForm';
-import {
-  mockSearchFrames,
-  mockMarkAsSold,
-  mockMarkAsDiscontinued,
-  mockUpdateFrame,
-} from '@/data/mockApi';
 import type { Frame } from '@/types/admin';
 import type { FrameFormData } from '@/lib/validations/admin';
 import { Search, Loader2 } from 'lucide-react';
@@ -42,11 +36,21 @@ export default function ManageInventoryPage() {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  const loadFrames = async () => {
+  const loadFrames = async (query?: string) => {
     setIsSearching(true);
     try {
-      const results = await mockSearchFrames(searchQuery, statusFilter);
-      setFrames(results);
+      const params = new URLSearchParams({
+        query: query !== undefined ? query : searchQuery,
+        status: statusFilter,
+      });
+      const response = await fetch(`/api/frames/search?${params}`);
+      const data = await response.json();
+
+      if (data.success) {
+        setFrames(data.frames);
+      } else {
+        throw new Error(data.error || 'Failed to load frames');
+      }
     } catch (error) {
       console.error('Error loading frames:', error);
       alert('Failed to load frames. Please try again.');
@@ -55,6 +59,16 @@ export default function ManageInventoryPage() {
       setIsLoading(false);
     }
   };
+
+  // Debounced live search
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      loadFrames();
+    }, 300); // 300ms delay after user stops typing
+
+    return () => clearTimeout(timeoutId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, statusFilter]);
 
   useEffect(() => {
     loadFrames();
@@ -70,11 +84,6 @@ export default function ManageInventoryPage() {
     setStatusFilter(value as 'All' | 'Active' | 'Sold' | 'Discontinued');
   };
 
-  useEffect(() => {
-    loadFrames();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter]);
-
   const handleEdit = (frame: Frame) => {
     setEditingFrame(frame);
     setEditModalOpen(true);
@@ -85,11 +94,22 @@ export default function ManageInventoryPage() {
 
     setIsSaving(true);
     try {
-      await mockUpdateFrame(editingFrame.frameId, data);
-      setEditModalOpen(false);
-      setEditingFrame(null);
-      await loadFrames();
-      alert('Frame updated successfully!');
+      const response = await fetch(`/api/frames/${editingFrame.frameId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setEditModalOpen(false);
+        setEditingFrame(null);
+        await loadFrames();
+        alert('Frame updated successfully!');
+      } else {
+        throw new Error(result.error || 'Failed to update frame');
+      }
     } catch (error) {
       console.error('Error updating frame:', error);
       alert('Failed to update frame. Please try again.');
@@ -100,9 +120,24 @@ export default function ManageInventoryPage() {
 
   const handleMarkAsSold = async (frameId: string, salePrice?: number, saleDate?: string) => {
     try {
-      await mockMarkAsSold(frameId, salePrice, saleDate);
-      await loadFrames();
-      alert('Frame marked as sold successfully!');
+      const response = await fetch(`/api/frames/${frameId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'mark_as_sold',
+          salePrice,
+          saleDate,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        await loadFrames();
+        alert('Frame marked as sold successfully!');
+      } else {
+        throw new Error(result.error || 'Failed to mark as sold');
+      }
     } catch (error) {
       console.error('Error marking frame as sold:', error);
       alert('Failed to mark frame as sold. Please try again.');
@@ -111,9 +146,22 @@ export default function ManageInventoryPage() {
 
   const handleMarkAsDiscontinued = async (frameId: string) => {
     try {
-      await mockMarkAsDiscontinued(frameId);
-      await loadFrames();
-      alert('Frame marked as discontinued successfully!');
+      const response = await fetch(`/api/frames/${frameId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'mark_as_discontinued',
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        await loadFrames();
+        alert('Frame marked as discontinued successfully!');
+      } else {
+        throw new Error(result.error || 'Failed to mark as discontinued');
+      }
     } catch (error) {
       console.error('Error marking frame as discontinued:', error);
       alert('Failed to mark frame as discontinued. Please try again.');
@@ -139,10 +187,11 @@ export default function ManageInventoryPage() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <Input
                   type="text"
-                  placeholder="Search by brand or model..."
+                  placeholder="Search by Frame ID, brand, or model... (e.g., 1-GG)"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="border-2 border-black pl-10"
+                  autoComplete="off"
                 />
               </div>
             </div>
@@ -232,14 +281,15 @@ export default function ManageInventoryPage() {
               <FrameForm
                 onSubmit={handleEditSubmit}
                 defaultValues={{
-                  brand: editingFrame.brand,
-                  model: editingFrame.model,
-                  color: editingFrame.color,
+                  brandId: parseInt(editingFrame.frameId.split('-')[0]),
+                  styleNumber: editingFrame.styleNumber,
+                  colorCode: editingFrame.colorCode,
+                  eyeSize: editingFrame.eyeSize,
                   gender: editingFrame.gender,
                   frameType: editingFrame.frameType,
+                  productType: editingFrame.productType,
                   costPrice: editingFrame.costPrice,
                   retailPrice: editingFrame.retailPrice,
-                  supplier: editingFrame.supplier,
                   notes: editingFrame.notes || '',
                 }}
                 isLoading={isSaving}

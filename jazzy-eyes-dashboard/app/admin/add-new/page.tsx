@@ -5,25 +5,56 @@ import { useRouter } from 'next/navigation';
 import { FrameForm } from '@/components/admin/FrameForm';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { mockAddFrame } from '@/data/mockApi';
-import type { FrameFormData } from '@/lib/validations/admin';
-import { CheckCircle2 } from 'lucide-react';
-import type { Frame } from '@/types/admin';
+import type { FrameFormData, Brand } from '@/types/admin';
+import { CheckCircle2, AlertCircle } from 'lucide-react';
+
+interface SavedFrameInfo {
+  frameId: string;
+  brand: string;
+  styleNumber: string;
+  colorCode: string;
+  eyeSize: string;
+}
 
 export default function AddNewFramePage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const [savedFrame, setSavedFrame] = useState<Frame | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [savedFrame, setSavedFrame] = useState<SavedFrameInfo | null>(null);
 
   const handleSubmit = async (data: FrameFormData) => {
     setIsLoading(true);
+    setError(null);
 
     try {
-      const newFrame = await mockAddFrame(data);
-      setSavedFrame(newFrame);
-    } catch (error) {
-      console.error('Error adding frame:', error);
-      alert('Failed to add frame. Please try again.');
+      const response = await fetch('/api/frames', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Failed to add frame');
+      }
+
+      // Fetch brand name for display
+      const brandResponse = await fetch('/api/brands');
+      const brandData = await brandResponse.json();
+      const brand = brandData.brands?.find((b: Brand) => b.id === data.brandId);
+
+      setSavedFrame({
+        frameId: result.frameId,
+        brand: brand?.brandName || 'Unknown',
+        styleNumber: data.styleNumber,
+        colorCode: data.colorCode,
+        eyeSize: data.eyeSize,
+      });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to add frame';
+      setError(errorMessage);
+      console.error('Error adding frame:', err);
     } finally {
       setIsLoading(false);
     }
@@ -31,6 +62,7 @@ export default function AddNewFramePage() {
 
   const handleAddAnother = () => {
     setSavedFrame(null);
+    setError(null);
   };
 
   const handleViewAll = () => {
@@ -64,16 +96,18 @@ export default function AddNewFramePage() {
               <div className="space-y-3 text-left">
                 <div className="border-b pb-3">
                   <p className="text-sm text-gray-600">Generated Frame ID</p>
-                  <p className="text-3xl font-bold text-black">
+                  <p className="text-3xl font-bold text-black font-mono">
                     {savedFrame.frameId}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Frame Details</p>
                   <p className="text-lg font-semibold">
-                    {savedFrame.brand} - {savedFrame.model}
+                    {savedFrame.brand} - {savedFrame.styleNumber}
                   </p>
-                  <p className="text-gray-600">{savedFrame.color}</p>
+                  <p className="text-gray-600">
+                    {savedFrame.colorCode} | {savedFrame.eyeSize}
+                  </p>
                 </div>
               </div>
             </Card>
@@ -81,7 +115,8 @@ export default function AddNewFramePage() {
             <div className="p-4 bg-sky-soft border-2 border-sky-deeper rounded-lg">
               <p className="font-semibold text-gray-800 mb-1">Next Step:</p>
               <p className="text-gray-700">
-                Create a label with ID: <span className="font-bold">{savedFrame.frameId}</span>
+                Create a label with ID:{' '}
+                <span className="font-bold font-mono">{savedFrame.frameId}</span>
               </p>
             </div>
 
@@ -114,6 +149,18 @@ export default function AddNewFramePage() {
           Add individual frames to your inventory. Fill out all required fields below.
         </p>
       </div>
+
+      {error && (
+        <Card className="p-4 border-2 border-red-500 bg-red-50">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-red-800">Error Adding Frame</p>
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          </div>
+        </Card>
+      )}
 
       <FrameForm onSubmit={handleSubmit} isLoading={isLoading} />
     </div>

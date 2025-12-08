@@ -1,8 +1,10 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { frameFormSchema, type FrameFormData } from '@/lib/validations/admin';
+import type { Brand } from '@/types/admin';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,17 +20,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
 
-const BRAND_OPTIONS = [
-  'Tom Ford',
-  'Cartier',
-  'Oliver Peoples',
-  'Ray-Ban',
-  'Gucci',
-  'Prada',
-  'Oakley',
-  'Other',
-];
-
 interface FrameFormProps {
   onSubmit: (data: FrameFormData) => void;
   defaultValues?: Partial<FrameFormData>;
@@ -42,6 +33,9 @@ export function FrameForm({
   isLoading = false,
   submitLabel = 'Save & Generate Label',
 }: FrameFormProps) {
+  const [brands, setBrands] = useState<Brand[]>([]);
+  const [loadingBrands, setLoadingBrands] = useState(true);
+
   const {
     register,
     handleSubmit,
@@ -52,25 +46,47 @@ export function FrameForm({
     resolver: zodResolver(frameFormSchema) as any,
     mode: 'onBlur',
     defaultValues: defaultValues || {
-      brand: '',
-      model: '',
-      color: '',
+      brandId: 0,
+      styleNumber: '',
+      colorCode: '',
+      eyeSize: '',
       gender: 'Unisex' as const,
-      frameType: 'Optical' as const,
+      frameType: 'Zyl' as const,
+      productType: 'Optical' as const,
+      invoiceDate: '',
       costPrice: 0,
       retailPrice: 0,
-      supplier: '',
       notes: '',
     },
   });
 
   const gender = watch('gender');
   const frameType = watch('frameType');
+  const productType = watch('productType');
+
+  // Fetch brands from API
+  useEffect(() => {
+    async function fetchBrands() {
+      try {
+        const response = await fetch('/api/brands');
+        const data = await response.json();
+        if (data.success && data.brands) {
+          setBrands(data.brands);
+        }
+      } catch (error) {
+        console.error('Error fetching brands:', error);
+      } finally {
+        setLoadingBrands(false);
+      }
+    }
+    fetchBrands();
+  }, []);
 
   const handleFormSubmit = (data: any) => {
-    // Convert string prices to numbers
+    // Ensure brandId is number and prices are numbers
     const formData = {
       ...data,
+      brandId: parseInt(data.brandId, 10),
       costPrice: parseFloat(data.costPrice),
       retailPrice: parseFloat(data.retailPrice),
     };
@@ -83,58 +99,81 @@ export function FrameForm({
         <div className="space-y-6">
           {/* Brand */}
           <div className="space-y-2">
-            <Label htmlFor="brand">
+            <Label htmlFor="brandId">
               Brand <span className="text-red-500">*</span>
             </Label>
-            <Select
-              onValueChange={(value) => setValue('brand', value)}
-              defaultValue={defaultValues?.brand}
-            >
-              <SelectTrigger className="border-2 border-black">
-                <SelectValue placeholder="Select a brand" />
-              </SelectTrigger>
-              <SelectContent>
-                {BRAND_OPTIONS.map((brand) => (
-                  <SelectItem key={brand} value={brand}>
-                    {brand}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.brand && (
-              <p className="text-sm text-red-500">{errors.brand.message}</p>
+            {loadingBrands ? (
+              <div className="flex items-center justify-center p-4 border-2 border-black rounded">
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                <span>Loading brands...</span>
+              </div>
+            ) : (
+              <Select
+                onValueChange={(value) => setValue('brandId', parseInt(value, 10) as any)}
+                defaultValue={defaultValues?.brandId?.toString()}
+              >
+                <SelectTrigger className="border-2 border-black">
+                  <SelectValue placeholder="Select a brand" />
+                </SelectTrigger>
+                <SelectContent>
+                  {brands.map((brand) => (
+                    <SelectItem key={brand.id} value={brand.id.toString()}>
+                      {brand.brandName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            {errors.brandId && (
+              <p className="text-sm text-red-500">{errors.brandId.message}</p>
             )}
           </div>
 
-          {/* Model */}
+          {/* Style Number */}
           <div className="space-y-2">
-            <Label htmlFor="model">
-              Model <span className="text-red-500">*</span>
+            <Label htmlFor="styleNumber">
+              Style Number <span className="text-red-500">*</span>
             </Label>
             <Input
-              id="model"
-              {...register('model')}
-              placeholder="e.g., Wayfarer, Santos"
+              id="styleNumber"
+              {...register('styleNumber')}
+              placeholder="e.g., TF5555, 0GC001689"
               className="border-2 border-black"
             />
-            {errors.model && (
-              <p className="text-sm text-red-500">{errors.model.message}</p>
+            {errors.styleNumber && (
+              <p className="text-sm text-red-500">{errors.styleNumber.message}</p>
             )}
           </div>
 
-          {/* Color */}
+          {/* Color Code */}
           <div className="space-y-2">
-            <Label htmlFor="color">
-              Color <span className="text-red-500">*</span>
+            <Label htmlFor="colorCode">
+              Color Code <span className="text-red-500">*</span>
             </Label>
             <Input
-              id="color"
-              {...register('color')}
-              placeholder="e.g., Black, Tortoise"
+              id="colorCode"
+              {...register('colorCode')}
+              placeholder="e.g., 001, BLK, TORT"
               className="border-2 border-black"
             />
-            {errors.color && (
-              <p className="text-sm text-red-500">{errors.color.message}</p>
+            {errors.colorCode && (
+              <p className="text-sm text-red-500">{errors.colorCode.message}</p>
+            )}
+          </div>
+
+          {/* Eye Size */}
+          <div className="space-y-2">
+            <Label htmlFor="eyeSize">
+              Eye Size <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="eyeSize"
+              {...register('eyeSize')}
+              placeholder="e.g., 52, 54-18, 55mm"
+              className="border-2 border-black"
+            />
+            {errors.eyeSize && (
+              <p className="text-sm text-red-500">{errors.eyeSize.message}</p>
             )}
           </div>
 
@@ -182,28 +221,80 @@ export function FrameForm({
             <RadioGroup
               value={frameType}
               onValueChange={(value) =>
-                setValue('frameType', value as 'Optical' | 'Sunglasses')
+                setValue('frameType', value as 'Zyl' | 'Metal' | 'Rimless')
               }
               className="flex space-x-4"
             >
               <div className="flex items-center space-x-2">
-                <RadioGroupItem value="Optical" id="optical" />
-                <Label htmlFor="optical" className="font-normal cursor-pointer">
+                <RadioGroupItem value="Zyl" id="zyl" />
+                <Label htmlFor="zyl" className="font-normal cursor-pointer">
+                  Zyl
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="Metal" id="metal" />
+                <Label htmlFor="metal" className="font-normal cursor-pointer">
+                  Metal
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="Rimless" id="rimless" />
+                <Label htmlFor="rimless" className="font-normal cursor-pointer">
+                  Rimless
+                </Label>
+              </div>
+            </RadioGroup>
+            {errors.frameType && (
+              <p className="text-sm text-red-500">{errors.frameType.message}</p>
+            )}
+          </div>
+
+          {/* Product Type */}
+          <div className="space-y-2">
+            <Label>
+              Product Type <span className="text-red-500">*</span>
+            </Label>
+            <RadioGroup
+              value={productType}
+              onValueChange={(value) =>
+                setValue('productType', value as 'Optical' | 'Sunglasses')
+              }
+              className="flex space-x-4"
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="Optical" id="productTypeOptical" />
+                <Label htmlFor="productTypeOptical" className="font-normal cursor-pointer">
                   Optical
                 </Label>
               </div>
               <div className="flex items-center space-x-2">
-                <RadioGroupItem value="Sunglasses" id="sunglasses" />
+                <RadioGroupItem value="Sunglasses" id="productTypeSunglasses" />
                 <Label
-                  htmlFor="sunglasses"
+                  htmlFor="productTypeSunglasses"
                   className="font-normal cursor-pointer"
                 >
                   Sunglasses
                 </Label>
               </div>
             </RadioGroup>
-            {errors.frameType && (
-              <p className="text-sm text-red-500">{errors.frameType.message}</p>
+            {errors.productType && (
+              <p className="text-sm text-red-500">{errors.productType.message}</p>
+            )}
+          </div>
+
+          {/* Invoice Date */}
+          <div className="space-y-2">
+            <Label htmlFor="invoiceDate">
+              Invoice Date
+            </Label>
+            <Input
+              id="invoiceDate"
+              type="date"
+              {...register('invoiceDate')}
+              className="border-2 border-black"
+            />
+            {errors.invoiceDate && (
+              <p className="text-sm text-red-500">{errors.invoiceDate.message}</p>
             )}
           </div>
 
@@ -256,22 +347,6 @@ export function FrameForm({
             </div>
           </div>
 
-          {/* Supplier */}
-          <div className="space-y-2">
-            <Label htmlFor="supplier">
-              Supplier <span className="text-red-500">*</span>
-            </Label>
-            <Input
-              id="supplier"
-              {...register('supplier')}
-              placeholder="e.g., Luxottica, Safilo Group"
-              className="border-2 border-black"
-            />
-            {errors.supplier && (
-              <p className="text-sm text-red-500">{errors.supplier.message}</p>
-            )}
-          </div>
-
           {/* Notes */}
           <div className="space-y-2">
             <Label htmlFor="notes">Notes (Optional)</Label>
@@ -292,7 +367,7 @@ export function FrameForm({
       <div className="flex justify-end">
         <Button
           type="submit"
-          disabled={isLoading}
+          disabled={isLoading || loadingBrands}
           className="bg-sky-deeper hover:bg-sky-deeper/90 text-black font-semibold border-2 border-black min-w-[200px]"
         >
           {isLoading ? (

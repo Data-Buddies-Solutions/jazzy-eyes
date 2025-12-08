@@ -1,30 +1,46 @@
+export interface Brand {
+  id: number;
+  brandName: string;
+  companyName: string;
+}
+
 export interface Frame {
   frameId: string;
   brand: string;
-  model: string;
-  color: string;
+  styleNumber: string;
+  colorCode: string;
+  eyeSize: string;
   gender: 'Men' | 'Women' | 'Unisex';
-  frameType: 'Optical' | 'Sunglasses';
+  frameType: 'Zyl' | 'Metal' | 'Rimless';
+  productType: 'Optical' | 'Sunglasses';
   costPrice: number;
   retailPrice: number;
   status: 'Active' | 'Sold' | 'Discontinued';
   dateAdded: string;
-  supplier: string;
   notes: string | null;
   saleDate?: string;
   salePrice?: number;
 }
 
 export interface FrameFormData {
-  brand: string;
-  model: string;
-  color: string;
+  brandId: number;
+  styleNumber: string;
+  colorCode: string;
+  eyeSize: string;
   gender: 'Men' | 'Women' | 'Unisex';
-  frameType: 'Optical' | 'Sunglasses';
+  frameType: 'Zyl' | 'Metal' | 'Rimless';
+  productType: 'Optical' | 'Sunglasses';
+  invoiceDate?: string;
   costPrice: number;
   retailPrice: number;
-  supplier: string;
   notes?: string;
+}
+
+export interface AddFrameResponse {
+  success: boolean;
+  frameId: string;
+  message?: string;
+  error?: string;
 }
 
 export interface ManualSaleData {

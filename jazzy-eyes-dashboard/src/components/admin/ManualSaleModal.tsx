@@ -82,11 +82,11 @@ export function ManualSaleModal({
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-600">Model:</span>
-                  <span className="font-semibold">{frame.model}</span>
+                  <span className="font-semibold">{frame.styleNumber}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-600">Color:</span>
-                  <span>{frame.color}</span>
+                  <span>{frame.colorCode}</span>
                 </div>
                 <div className="flex justify-between border-t pt-2">
                   <span className="text-sm text-gray-600">Retail Price:</span>
