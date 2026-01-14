@@ -93,9 +93,9 @@ export function FrameForm({
   };
 
   return (
-    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
-      <Card className="p-4 border-2 border-black">
-        <div className="space-y-4">
+    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-5">
+      <Card className="p-5 border-2 border-black">
+        <div className="space-y-5">
           {/* Brand */}
           <div className="space-y-2">
             <Label htmlFor="brandId">
