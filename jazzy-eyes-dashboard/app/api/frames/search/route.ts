@@ -104,7 +104,7 @@ export async function GET(request: NextRequest) {
           color: product.colorCode,
           eyeSize: product.eyeSize,
           gender: product.gender as 'Men' | 'Women' | 'Unisex',
-          frameType: product.frameType as any,
+          frameType: product.frameType as 'Zyl' | 'Metal' | 'Rimless' | 'Semi-rimless' | 'Clip',
           productType: product.productType as 'Optical' | 'Sun',
           invoiceDate,
           costPrice,

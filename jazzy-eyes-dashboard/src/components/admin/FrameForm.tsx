@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { frameFormSchema, type FrameFormData } from '@/lib/validations/admin';
 import type { Brand } from '@/types/admin';
@@ -42,7 +42,7 @@ export function FrameForm({
     setValue,
     watch,
   } = useForm<FrameFormData>({
-    resolver: zodResolver(frameFormSchema) as any,
+    resolver: zodResolver(frameFormSchema) as Resolver<FrameFormData>,
     mode: 'onBlur',
     defaultValues: defaultValues || {
       brandId: 0,
@@ -108,7 +108,7 @@ export function FrameForm({
               </div>
             ) : (
               <Select
-                onValueChange={(value) => setValue('brandId', parseInt(value, 10) as any)}
+                onValueChange={(value) => setValue('brandId', parseInt(value, 10))}
                 defaultValue={defaultValues?.brandId?.toString()}
               >
                 <SelectTrigger className="border-2 border-black">

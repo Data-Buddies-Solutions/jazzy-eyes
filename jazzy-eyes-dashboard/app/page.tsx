@@ -15,15 +15,27 @@ export default function LoginPage() {
     setError('');
     setIsLoading(true);
 
-    // Simple hardcoded auth
-    if (email === 'info@jazzyeyes.com' && password === '12345') {
-      localStorage.setItem('jazzy-eyes-auth', 'true');
-      router.push('/admin/manage');
-    } else {
-      setError('Invalid email or password');
-    }
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
 
-    setIsLoading(false);
+      const data = await response.json();
+
+      if (data.success) {
+        router.push('/admin/manage');
+      } else {
+        setError(data.error || 'Invalid email or password');
+      }
+    } catch {
+      setError('An error occurred. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

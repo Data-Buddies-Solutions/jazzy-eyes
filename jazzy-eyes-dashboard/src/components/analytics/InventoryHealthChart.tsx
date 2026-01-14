@@ -98,7 +98,7 @@ export function InventoryHealthChart() {
           <ResponsiveContainer width="100%" height={250}>
             <PieChart>
               <Pie
-                data={data.statusDistribution as any}
+                data={data.statusDistribution as Array<{ statusName: string; count: number; colorScheme: string }>}
                 cx="50%"
                 cy="50%"
                 outerRadius={80}

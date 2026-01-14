@@ -1,6 +1,6 @@
 'use client';
 
-import { useForm } from 'react-hook-form';
+import { useForm, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   createStatusSchema,
@@ -53,8 +53,8 @@ export function StatusForm({
     formState: { errors },
     setValue,
     watch,
-  } = useForm({
-    resolver: zodResolver(mode === 'create' ? createStatusSchema : updateStatusSchema) as any,
+  } = useForm<CreateStatusData | UpdateStatusData>({
+    resolver: zodResolver(mode === 'create' ? createStatusSchema : updateStatusSchema) as Resolver<CreateStatusData | UpdateStatusData>,
     defaultValues,
     mode: 'onBlur',
   });
@@ -90,7 +90,7 @@ export function StatusForm({
           </Label>
           <Select
             value={selectedColor}
-            onValueChange={(value) => setValue('colorScheme', value as any)}
+            onValueChange={(value) => setValue('colorScheme', value as CreateStatusData['colorScheme'])}
             disabled={isLoading}
           >
             <SelectTrigger className="border-2 border-black">

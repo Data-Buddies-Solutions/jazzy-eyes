@@ -1,6 +1,6 @@
 'use client';
 
-import { useForm } from 'react-hook-form';
+import { useForm, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   createBrandSchema,
@@ -37,8 +37,8 @@ export function BrandForm({
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm({
-    resolver: zodResolver(mode === 'create' ? createBrandSchema : updateBrandSchema) as any,
+  } = useForm<CreateBrandData | UpdateBrandData>({
+    resolver: zodResolver(mode === 'create' ? createBrandSchema : updateBrandSchema) as Resolver<CreateBrandData | UpdateBrandData>,
     defaultValues:
       mode === 'create' && companyName && companyId
         ? { ...defaultValues, companyName, companyId }
@@ -85,13 +85,13 @@ export function BrandForm({
             <Input
               id="brandId"
               type="number"
-              {...register('brandId')}
+              {...register('brandId' as keyof (CreateBrandData | UpdateBrandData))}
               placeholder="Enter brand ID"
-              className={`border-2 ${(errors as any).brandId ? 'border-red-500' : 'border-black'}`}
+              className={`border-2 ${'brandId' in errors ? 'border-red-500' : 'border-black'}`}
               disabled={isLoading}
             />
-            {(errors as any).brandId && (
-              <p className="text-sm text-red-600">{(errors as any).brandId.message}</p>
+            {'brandId' in errors && errors.brandId && (
+              <p className="text-sm text-red-600">{errors.brandId.message}</p>
             )}
             <p className="text-sm text-gray-600">
               Suggested: {companyId ? `${companyId + 1}, ${companyId + 2}, etc.` : 'N/A'}
@@ -106,13 +106,13 @@ export function BrandForm({
             <Input
               id="id"
               type="number"
-              {...(register as any)('id')}
+              {...register('id' as keyof (CreateBrandData | UpdateBrandData))}
               placeholder="Enter brand ID"
-              className={`border-2 ${(errors as any).id ? 'border-red-500' : 'border-black'}`}
+              className={`border-2 ${'id' in errors ? 'border-red-500' : 'border-black'}`}
               disabled={isLoading}
             />
-            {(errors as any).id && (
-              <p className="text-sm text-red-600">{(errors as any).id.message}</p>
+            {'id' in errors && errors.id && (
+              <p className="text-sm text-red-600">{errors.id.message}</p>
             )}
           </div>
         )}

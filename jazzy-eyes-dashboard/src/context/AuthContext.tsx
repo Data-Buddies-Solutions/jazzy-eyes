@@ -1,35 +1,32 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 
 interface AuthContextType {
   isAuthenticated: boolean;
-  isLoading: boolean;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  // Assume authenticated if we reach protected pages (middleware handles redirects)
+  const [isAuthenticated, setIsAuthenticated] = useState(true);
 
-  useEffect(() => {
-    const auth = localStorage.getItem('jazzy-eyes-auth');
-    setIsAuthenticated(auth === 'true');
-    setIsLoading(false);
-  }, []);
-
-  const logout = () => {
-    localStorage.removeItem('jazzy-eyes-auth');
-    setIsAuthenticated(false);
-    router.push('/');
-  };
+  const logout = useCallback(async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      setIsAuthenticated(false);
+      router.push('/');
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  }, [router]);
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, isLoading, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, logout }}>
       {children}
     </AuthContext.Provider>
   );
