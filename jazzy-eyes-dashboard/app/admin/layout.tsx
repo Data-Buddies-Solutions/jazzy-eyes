@@ -33,7 +33,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-white flex">
+    <div className="bg-white flex" style={{ minHeight: 'calc(100vh / 0.8)' }}>
       {/* Sidebar */}
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 

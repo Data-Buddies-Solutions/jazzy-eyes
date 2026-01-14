@@ -16,7 +16,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
 
@@ -94,9 +93,9 @@ export function FrameForm({
   };
 
   return (
-    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
-      <Card className="p-6 border-2 border-black">
-        <div className="space-y-6">
+    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
+      <Card className="p-4 border-2 border-black">
+        <div className="space-y-4">
           {/* Brand */}
           <div className="space-y-2">
             <Label htmlFor="brandId">
@@ -362,11 +361,11 @@ export function FrameForm({
           {/* Notes */}
           <div className="space-y-2">
             <Label htmlFor="notes">Notes (Optional)</Label>
-            <Textarea
+            <Input
               id="notes"
               {...register('notes')}
               placeholder="Additional information about this frame"
-              className="border-2 border-black min-h-[100px]"
+              className="border-2 border-black"
             />
             {errors.notes && (
               <p className="text-sm text-red-500">{errors.notes.message}</p>

@@ -66,9 +66,10 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed top-0 left-0 z-50 h-screen w-64 bg-white border-r-2 border-black transition-transform duration-300 lg:translate-x-0 lg:static lg:z-0 flex flex-col',
+          'fixed top-0 left-0 z-50 w-64 bg-white border-r-2 border-black transition-transform duration-300 lg:translate-x-0 lg:static lg:z-0 flex flex-col',
           isOpen ? 'translate-x-0' : '-translate-x-full'
         )}
+        style={{ height: 'calc(100vh / 0.8)' }}
       >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b-2 border-black flex-shrink-0">
@@ -125,7 +126,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         </nav>
 
         {/* Footer */}
-        <div className="p-4 border-t-2 border-black flex-shrink-0">
+        <div className="p-4 border-y-2 border-black flex-shrink-0">
           <Button
             variant="outline"
             className="w-full border-2 border-black"
