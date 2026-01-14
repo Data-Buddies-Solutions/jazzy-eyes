@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import bcrypt from 'bcryptjs';
 
 export async function POST(request: NextRequest) {
   try {
@@ -7,9 +6,9 @@ export async function POST(request: NextRequest) {
 
     // Get credentials from environment variables
     const adminEmail = process.env.ADMIN_EMAIL;
-    const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH;
+    const adminPassword = process.env.ADMIN_PASSWORD;
 
-    if (!adminEmail || !adminPasswordHash) {
+    if (!adminEmail || !adminPassword) {
       console.error('Admin credentials not configured in environment variables');
       return NextResponse.json(
         { success: false, error: 'Server configuration error' },
@@ -17,17 +16,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate email
-    if (email !== adminEmail) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid email or password' },
-        { status: 401 }
-      );
-    }
-
-    // Validate password
-    const isValidPassword = await bcrypt.compare(password, adminPasswordHash);
-    if (!isValidPassword) {
+    // Validate credentials
+    if (email !== adminEmail || password !== adminPassword) {
       return NextResponse.json(
         { success: false, error: 'Invalid email or password' },
         { status: 401 }
