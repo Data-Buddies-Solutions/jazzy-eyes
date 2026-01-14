@@ -6,6 +6,9 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const query = searchParams.get('query') || '';
     const statusFilter = searchParams.get('status') || 'All';
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '20');
+    const skip = (page - 1) * limit;
 
     // Build where clause
     const where: any = {};
@@ -36,7 +39,17 @@ export async function GET(request: NextRequest) {
       ];
     }
 
-    // Fetch products with their transactions to determine status
+    // Add status filter to where clause if specified
+    if (statusFilter && statusFilter !== 'All') {
+      where.status = {
+        name: statusFilter,
+      };
+    }
+
+    // Get total count for pagination
+    const totalCount = await prisma.product.count({ where });
+
+    // Fetch products with their status and transactions (paginated)
     const products = await prisma.product.findMany({
       where,
       include: {
@@ -46,40 +59,33 @@ export async function GET(request: NextRequest) {
             companyName: true,
           },
         },
+        status: {
+          select: {
+            id: true,
+            name: true,
+            colorScheme: true,
+          },
+        },
         transactions: {
           orderBy: { transactionDate: 'desc' },
         },
       },
       orderBy: { createdAt: 'desc' },
+      skip,
+      take: limit,
     });
 
-    // Transform to Frame format and calculate status
+    // Transform to Frame format using database status
     const frames = products
       .map((product) => {
-        // Calculate status based on transactions
-        let status: 'Active' | 'Sold' | 'Discontinued' = 'Active';
-        let saleDate: string | undefined;
-        let salePrice: number | undefined;
-
+        // Get sale info if exists
         const saleTransaction = product.transactions.find(
           (t) => t.transactionType === 'SALE'
         );
 
-        if (saleTransaction) {
-          status = 'Sold';
-          saleDate = saleTransaction.transactionDate.toISOString();
-          salePrice = Number(saleTransaction.unitPrice);
-        }
-
-        // Get latest ORDER transaction for cost/retail price
         const orderTransaction = product.transactions.find(
           (t) => t.transactionType === 'ORDER'
         );
-
-        // Check if discontinued
-        if (orderTransaction?.status === 'discontinued' || orderTransaction?.notes === 'DISCONTINUED') {
-          status = 'Discontinued';
-        }
 
         const costPrice = orderTransaction
           ? Number(orderTransaction.unitCost)
@@ -87,6 +93,9 @@ export async function GET(request: NextRequest) {
         const retailPrice = orderTransaction
           ? Number(orderTransaction.unitPrice)
           : 0;
+        const invoiceDate = orderTransaction?.invoiceDate
+          ? orderTransaction.invoiceDate.toISOString()
+          : undefined;
 
         return {
           frameId: product.compositeId,
@@ -97,24 +106,34 @@ export async function GET(request: NextRequest) {
           gender: product.gender as 'Men' | 'Women' | 'Unisex',
           frameType: product.frameType as any,
           productType: product.productType as 'Optical' | 'Sun',
+          invoiceDate,
           costPrice,
           retailPrice,
-          status,
+          status: product.status?.name || 'Active',
+          statusId: product.status?.id,
+          statusColorScheme: product.status?.colorScheme || 'green',
           dateAdded: product.createdAt.toISOString(),
           notes: orderTransaction?.notes?.replace('DISCONTINUED', '').trim() || null,
-          saleDate,
-          salePrice,
+          saleDate: saleTransaction ? saleTransaction.transactionDate.toISOString() : undefined,
+          salePrice: saleTransaction ? Number(saleTransaction.unitPrice) : undefined,
           styleNumber: product.styleNumber,
           colorCode: product.colorCode,
+          currentQty: product.currentQty,
         };
-      })
-      .filter((frame) => {
-        // Apply status filter
-        if (statusFilter === 'All') return true;
-        return frame.status === statusFilter;
       });
 
-    return NextResponse.json({ success: true, frames });
+    const totalPages = Math.ceil(totalCount / limit);
+
+    return NextResponse.json({
+      success: true,
+      frames,
+      pagination: {
+        page,
+        limit,
+        totalCount,
+        totalPages,
+      },
+    });
   } catch (error) {
     console.error('Error searching frames:', error);
     return NextResponse.json(

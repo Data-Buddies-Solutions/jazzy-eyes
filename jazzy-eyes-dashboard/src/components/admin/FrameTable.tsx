@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -11,69 +10,57 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Edit, ShoppingCart, Ban } from 'lucide-react';
+import { Edit, Package, AlertTriangle, History, ShoppingCart } from 'lucide-react';
 import type { Frame } from '@/types/admin';
 import { ManualSaleModal } from './ManualSaleModal';
+import { WriteOffModal } from './WriteOffModal';
+import { RestockModal } from './RestockModal';
+import { TransactionHistoryModal } from './TransactionHistoryModal';
 
 interface FrameTableProps {
   frames: Frame[];
   onEdit: (frame: Frame) => void;
-  onMarkAsSold: (frameId: string, salePrice?: number, saleDate?: string) => Promise<void>;
-  onMarkAsDiscontinued: (frameId: string) => Promise<void>;
+  onMarkAsSold: (frameId: string, quantity: number, salePrice?: number, saleDate?: string) => Promise<void>;
+  onRefresh: () => void;
 }
 
 export function FrameTable({
   frames,
   onEdit,
   onMarkAsSold,
-  onMarkAsDiscontinued,
+  onRefresh,
 }: FrameTableProps) {
   const [selectedFrame, setSelectedFrame] = useState<Frame | null>(null);
   const [saleModalOpen, setSaleModalOpen] = useState(false);
-
-  const getStatusBadge = (status: Frame['status']) => {
-    switch (status) {
-      case 'Active':
-        return (
-          <Badge className="bg-green-100 text-green-800 border-green-300">
-            Active
-          </Badge>
-        );
-      case 'Sold':
-        return (
-          <Badge className="bg-blue-100 text-blue-800 border-blue-300">
-            Sold
-          </Badge>
-        );
-      case 'Discontinued':
-        return (
-          <Badge className="bg-gray-100 text-gray-800 border-gray-300">
-            Discontinued
-          </Badge>
-        );
-    }
-  };
+  const [writeOffModalOpen, setWriteOffModalOpen] = useState(false);
+  const [restockModalOpen, setRestockModalOpen] = useState(false);
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
 
   const handleMarkAsSold = (frame: Frame) => {
     setSelectedFrame(frame);
     setSaleModalOpen(true);
   };
 
-  const handleSaleSubmit = async (salePrice?: number, saleDate?: string) => {
-    if (selectedFrame) {
-      await onMarkAsSold(selectedFrame.frameId, salePrice, saleDate);
-      setSaleModalOpen(false);
-      setSelectedFrame(null);
-    }
+  const handleWriteOff = (frame: Frame) => {
+    setSelectedFrame(frame);
+    setWriteOffModalOpen(true);
   };
 
-  const handleMarkAsDiscontinued = async (frameId: string) => {
-    if (
-      confirm(
-        'Are you sure you want to mark this frame as discontinued? This action can be reversed by editing the frame.'
-      )
-    ) {
-      await onMarkAsDiscontinued(frameId);
+  const handleRestock = (frame: Frame) => {
+    setSelectedFrame(frame);
+    setRestockModalOpen(true);
+  };
+
+  const handleHistory = (frame: Frame) => {
+    setSelectedFrame(frame);
+    setHistoryModalOpen(true);
+  };
+
+  const handleSaleSubmit = async (quantity: number, salePrice?: number, saleDate?: string) => {
+    if (selectedFrame) {
+      await onMarkAsSold(selectedFrame.frameId, quantity, salePrice, saleDate);
+      setSaleModalOpen(false);
+      setSelectedFrame(null);
     }
   };
 
@@ -98,6 +85,7 @@ export function FrameTable({
               <TableHead className="font-bold text-black">Brand</TableHead>
               <TableHead className="font-bold text-black">Model</TableHead>
               <TableHead className="font-bold text-black">Color</TableHead>
+              <TableHead className="font-bold text-black text-center">Qty</TableHead>
               <TableHead className="font-bold text-black">Type</TableHead>
               <TableHead className="font-bold text-black">Status</TableHead>
               <TableHead className="font-bold text-black text-right">
@@ -117,41 +105,75 @@ export function FrameTable({
                 <TableCell>{frame.brand}</TableCell>
                 <TableCell>{frame.styleNumber}</TableCell>
                 <TableCell>{frame.colorCode}</TableCell>
+                <TableCell className="text-center font-semibold">
+                  {frame.currentQty}
+                </TableCell>
                 <TableCell>{frame.frameType}</TableCell>
-                <TableCell>{getStatusBadge(frame.status)}</TableCell>
+                <TableCell>
+                  {frame.currentQty === 0 ? (
+                    <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-300">
+                      Sold Out
+                    </span>
+                  ) : (
+                    <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-300">
+                      Active
+                    </span>
+                  )}
+                </TableCell>
                 <TableCell className="text-right font-semibold">
                   ${frame.retailPrice.toFixed(2)}
                 </TableCell>
                 <TableCell className="text-right">
-                  <div className="flex justify-end gap-2">
+                  <div className="flex justify-end gap-1 flex-wrap">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => onEdit(frame)}
                       className="border-black"
+                      title="Edit"
                     >
                       <Edit className="w-4 h-4" />
                     </Button>
-                    {frame.status === 'Active' && (
+                    {frame.currentQty > 0 && (
                       <>
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => handleMarkAsSold(frame)}
-                          className="border-black hover:bg-sky-soft"
+                          className="border-green-600 text-green-700 hover:bg-green-50"
+                          title="Sell"
                         >
                           <ShoppingCart className="w-4 h-4" />
                         </Button>
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleMarkAsDiscontinued(frame.frameId)}
-                          className="border-black hover:bg-red-50"
+                          onClick={() => handleWriteOff(frame)}
+                          className="border-red-600 text-red-700 hover:bg-red-50"
+                          title="Write Off"
                         >
-                          <Ban className="w-4 h-4" />
+                          <AlertTriangle className="w-4 h-4" />
                         </Button>
                       </>
                     )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleRestock(frame)}
+                      className="border-purple-600 text-purple-700 hover:bg-purple-50"
+                      title="Restock"
+                    >
+                      <Package className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleHistory(frame)}
+                      className="border-gray-600 text-gray-700 hover:bg-gray-50"
+                      title="History"
+                    >
+                      <History className="w-4 h-4" />
+                    </Button>
                   </div>
                 </TableCell>
               </TableRow>
@@ -161,12 +183,31 @@ export function FrameTable({
       </div>
 
       {selectedFrame && (
-        <ManualSaleModal
-          open={saleModalOpen}
-          onOpenChange={setSaleModalOpen}
-          frame={selectedFrame}
-          onSubmit={handleSaleSubmit}
-        />
+        <>
+          <ManualSaleModal
+            open={saleModalOpen}
+            onOpenChange={setSaleModalOpen}
+            frame={selectedFrame}
+            onSubmit={handleSaleSubmit}
+          />
+          <WriteOffModal
+            open={writeOffModalOpen}
+            onOpenChange={setWriteOffModalOpen}
+            frame={selectedFrame}
+            onSuccess={onRefresh}
+          />
+          <RestockModal
+            open={restockModalOpen}
+            onOpenChange={setRestockModalOpen}
+            frame={selectedFrame}
+            onSuccess={onRefresh}
+          />
+          <TransactionHistoryModal
+            open={historyModalOpen}
+            onOpenChange={setHistoryModalOpen}
+            frame={selectedFrame}
+          />
+        </>
       )}
     </>
   );

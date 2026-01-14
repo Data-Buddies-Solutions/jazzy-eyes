@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -13,39 +13,44 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
-import type { Frame } from '@/types/admin';
-import { Loader2, Minus, Plus } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import type { Frame, WriteOffReason } from '@/types/admin';
+import { Loader2, Minus, Plus, AlertTriangle } from 'lucide-react';
 
-interface ManualSaleModalProps {
+interface WriteOffModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   frame: Frame;
-  onSubmit: (quantity: number, salePrice?: number, saleDate?: string) => Promise<void>;
+  onSuccess: () => void;
 }
 
-export function ManualSaleModal({
+const WRITE_OFF_REASONS: { value: WriteOffReason; label: string }[] = [
+  { value: 'damaged', label: 'Damaged' },
+  { value: 'lost', label: 'Lost/Missing' },
+  { value: 'defective', label: 'Defective' },
+  { value: 'other', label: 'Other' },
+];
+
+export function WriteOffModal({
   open,
   onOpenChange,
   frame,
-}: ManualSaleModalProps & { onSubmit: (quantity: number, salePrice?: number, saleDate?: string) => Promise<void> }) {
+  onSuccess,
+}: WriteOffModalProps) {
   const [quantity, setQuantity] = useState<number>(1);
-  const [salePrice, setSalePrice] = useState<string>(frame.retailPrice.toString());
-  const [saleDate, setSaleDate] = useState<string>(
-    new Date().toISOString().split('T')[0] // Format: YYYY-MM-DD
-  );
+  const [reason, setReason] = useState<WriteOffReason | ''>('');
+  const [notes, setNotes] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
 
   const maxQty = frame.currentQty;
-
-  // Reset form when modal opens or frame changes
-  useEffect(() => {
-    if (open) {
-      setQuantity(1);
-      setSalePrice(frame.retailPrice.toString());
-      setSaleDate(new Date().toISOString().split('T')[0]);
-    }
-  }, [open, frame.frameId, frame.retailPrice]);
 
   const handleQuantityChange = (delta: number) => {
     const newQty = quantity + delta;
@@ -56,58 +61,60 @@ export function ManualSaleModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!reason) {
+      toast.error('Please select a reason for the write-off');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      const price = parseFloat(salePrice);
-      const finalPrice = price !== frame.retailPrice ? price : undefined;
-
-      // Convert date to ISO string for the API
-      const dateObj = new Date(saleDate);
-      const finalDate = dateObj.toISOString();
-
-      // Call the parent's onSubmit with quantity
       const response = await fetch(`/api/frames/${frame.frameId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'mark_as_sold',
+          action: 'write_off',
           quantity,
-          salePrice: finalPrice,
-          saleDate: finalDate,
+          reason,
+          notes: notes.trim() || undefined,
         }),
       });
 
       const result = await response.json();
 
       if (result.success) {
-        toast.success(result.message || `Sold ${quantity} unit(s) successfully!`);
+        toast.success(result.message || `Written off ${quantity} unit(s) successfully!`);
         onOpenChange(false);
         // Reset form
         setQuantity(1);
-        // Trigger a page refresh or callback to reload frames
-        window.location.reload();
+        setReason('');
+        setNotes('');
+        onSuccess();
       } else {
-        throw new Error(result.error || 'Failed to record sale');
+        throw new Error(result.error || 'Failed to write off');
       }
     } catch (error) {
-      console.error('Error recording sale:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to record sale. Please try again.');
+      console.error('Error writing off frame:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to write off. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const totalSaleAmount = parseFloat(salePrice) * quantity;
+  const totalLossAmount = frame.costPrice * quantity;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px] border-2 border-black">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle className="text-2xl">Sell Frame</DialogTitle>
+            <DialogTitle className="text-2xl flex items-center gap-2">
+              <AlertTriangle className="h-6 w-6 text-yellow-600" />
+              Write Off Frame
+            </DialogTitle>
             <DialogDescription>
-              Record a sale for this frame. Select the quantity and enter sale details.
+              Remove damaged, lost, or defective frames from inventory. This action creates an audit trail.
             </DialogDescription>
           </DialogHeader>
 
@@ -127,18 +134,14 @@ export function ManualSaleModal({
                   <span className="text-sm text-gray-600">Model:</span>
                   <span className="font-semibold">{frame.styleNumber}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Color:</span>
-                  <span>{frame.colorCode}</span>
-                </div>
                 <div className="flex justify-between border-t pt-2">
                   <span className="text-sm text-gray-600">Available Stock:</span>
                   <span className="font-semibold">{frame.currentQty} unit(s)</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Retail Price:</span>
+                  <span className="text-sm text-gray-600">Cost per Unit:</span>
                   <span className="font-semibold">
-                    ${frame.retailPrice.toFixed(2)}
+                    ${frame.costPrice.toFixed(2)}
                   </span>
                 </div>
               </div>
@@ -146,7 +149,7 @@ export function ManualSaleModal({
 
             {/* Quantity Selector */}
             <div className="space-y-2">
-              <Label>Quantity to Sell</Label>
+              <Label>Quantity to Write Off</Label>
               <div className="flex items-center gap-3">
                 <Button
                   type="button"
@@ -187,55 +190,46 @@ export function ManualSaleModal({
               </div>
             </div>
 
-            {/* Sale Price Override */}
+            {/* Reason Select */}
             <div className="space-y-2">
-              <Label htmlFor="salePrice">
-                Sale Price per Unit (Optional Override)
-              </Label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
-                  $
-                </span>
-                <Input
-                  id="salePrice"
-                  type="number"
-                  step="0.01"
-                  value={salePrice}
-                  onChange={(e) => setSalePrice(e.target.value)}
-                  className="border-2 border-black pl-7"
-                />
-              </div>
-              <p className="text-xs text-gray-500">
-                Leave as retail price or enter a different amount if the frame
-                was sold at a discount or premium.
-              </p>
+              <Label htmlFor="reason">Reason *</Label>
+              <Select value={reason} onValueChange={(value) => setReason(value as WriteOffReason)}>
+                <SelectTrigger className="border-2 border-black">
+                  <SelectValue placeholder="Select a reason" />
+                </SelectTrigger>
+                <SelectContent>
+                  {WRITE_OFF_REASONS.map((r) => (
+                    <SelectItem key={r.value} value={r.value}>
+                      {r.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
-            {/* Sale Date */}
+            {/* Notes */}
             <div className="space-y-2">
-              <Label htmlFor="saleDate">Sale Date</Label>
-              <Input
-                id="saleDate"
-                type="date"
-                value={saleDate}
-                onChange={(e) => setSaleDate(e.target.value)}
+              <Label htmlFor="notes">Notes (Optional)</Label>
+              <Textarea
+                id="notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Add any additional details..."
                 className="border-2 border-black"
+                rows={3}
               />
-              <p className="text-xs text-gray-500">
-                Defaults to today but can be changed if needed
-              </p>
             </div>
 
-            {/* Total Sale Amount */}
-            <Card className="p-4 border-2 border-black bg-green-50">
+            {/* Total Loss Amount */}
+            <Card className="p-4 border-2 border-red-300 bg-red-50">
               <div className="flex justify-between items-center">
-                <span className="font-semibold">Total Sale Amount:</span>
-                <span className="text-xl font-bold text-green-700">
-                  ${totalSaleAmount.toFixed(2)}
+                <span className="font-semibold">Total Loss (at cost):</span>
+                <span className="text-xl font-bold text-red-700">
+                  ${totalLossAmount.toFixed(2)}
                 </span>
               </div>
               <p className="text-xs text-gray-500 mt-1">
-                {quantity} unit(s) x ${parseFloat(salePrice).toFixed(2)}
+                {quantity} unit(s) x ${frame.costPrice.toFixed(2)} cost
               </p>
             </Card>
           </div>
@@ -252,16 +246,16 @@ export function ManualSaleModal({
             </Button>
             <Button
               type="submit"
-              disabled={isLoading || quantity < 1 || quantity > maxQty}
-              className="bg-sky-deeper hover:bg-sky-deeper/90 text-black font-semibold border-2 border-black"
+              disabled={isLoading || !reason || quantity < 1 || quantity > maxQty}
+              className="bg-red-600 hover:bg-red-700 text-white font-semibold border-2 border-red-800"
             >
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Recording...
+                  Processing...
                 </>
               ) : (
-                `Confirm Sale (${quantity} unit${quantity > 1 ? 's' : ''})`
+                `Write Off ${quantity} Unit${quantity > 1 ? 's' : ''}`
               )}
             </Button>
           </DialogFooter>

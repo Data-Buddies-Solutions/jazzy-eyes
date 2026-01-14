@@ -1,16 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { FrameTable } from '@/components/admin/FrameTable';
 import {
   Dialog,
@@ -21,54 +14,65 @@ import {
 import { FrameForm } from '@/components/admin/FrameForm';
 import type { Frame } from '@/types/admin';
 import type { FrameFormData } from '@/lib/validations/admin';
-import { Search, Loader2 } from 'lucide-react';
+import { Search, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+
+interface Pagination {
+  page: number;
+  limit: number;
+  totalCount: number;
+  totalPages: number;
+}
 
 export default function ManageInventoryPage() {
-  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<
-    'All' | 'Active' | 'Sold' | 'Discontinued'
-  >('All');
   const [frames, setFrames] = useState<Frame[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
   const [editingFrame, setEditingFrame] = useState<Frame | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [pagination, setPagination] = useState<Pagination>({
+    page: 1,
+    limit: 20,
+    totalCount: 0,
+    totalPages: 0,
+  });
 
-  const loadFrames = async (query?: string) => {
+  const loadFrames = async (query?: string, page: number = 1) => {
     setIsSearching(true);
     try {
       const params = new URLSearchParams({
         query: query !== undefined ? query : searchQuery,
-        status: statusFilter,
+        page: page.toString(),
+        limit: '20',
       });
       const response = await fetch(`/api/frames/search?${params}`);
       const data = await response.json();
 
       if (data.success) {
         setFrames(data.frames);
+        setPagination(data.pagination);
       } else {
         throw new Error(data.error || 'Failed to load frames');
       }
     } catch (error) {
       console.error('Error loading frames:', error);
-      alert('Failed to load frames. Please try again.');
+      toast.error('Failed to load frames. Please try again.');
     } finally {
       setIsSearching(false);
       setIsLoading(false);
     }
   };
 
-  // Debounced live search
+  // Debounced live search - reset to page 1 on new search
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      loadFrames();
+      loadFrames(searchQuery, 1);
     }, 300); // 300ms delay after user stops typing
 
     return () => clearTimeout(timeoutId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, statusFilter]);
+  }, [searchQuery]);
 
   useEffect(() => {
     loadFrames();
@@ -77,11 +81,11 @@ export default function ManageInventoryPage() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    loadFrames();
+    loadFrames(searchQuery, 1);
   };
 
-  const handleStatusFilterChange = (value: string) => {
-    setStatusFilter(value as 'All' | 'Active' | 'Sold' | 'Discontinued');
+  const handlePageChange = (newPage: number) => {
+    loadFrames(searchQuery, newPage);
   };
 
   const handleEdit = (frame: Frame) => {
@@ -106,25 +110,31 @@ export default function ManageInventoryPage() {
         setEditModalOpen(false);
         setEditingFrame(null);
         await loadFrames();
-        alert('Frame updated successfully!');
+        toast.success('Frame updated successfully!');
       } else {
         throw new Error(result.error || 'Failed to update frame');
       }
     } catch (error) {
       console.error('Error updating frame:', error);
-      alert('Failed to update frame. Please try again.');
+      toast.error('Failed to update frame. Please try again.');
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleMarkAsSold = async (frameId: string, salePrice?: number, saleDate?: string) => {
+  const handleMarkAsSold = async (
+    frameId: string,
+    quantity: number,
+    salePrice?: number,
+    saleDate?: string
+  ) => {
     try {
       const response = await fetch(`/api/frames/${frameId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'mark_as_sold',
+          quantity,
           salePrice,
           saleDate,
         }),
@@ -134,38 +144,20 @@ export default function ManageInventoryPage() {
 
       if (result.success) {
         await loadFrames();
-        alert('Frame marked as sold successfully!');
+        toast.success(result.message || `Sold ${quantity} unit(s) successfully!`);
       } else {
         throw new Error(result.error || 'Failed to mark as sold');
       }
     } catch (error) {
       console.error('Error marking frame as sold:', error);
-      alert('Failed to mark frame as sold. Please try again.');
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to mark frame as sold. Please try again.'
+      );
     }
   };
 
-  const handleMarkAsDiscontinued = async (frameId: string) => {
-    try {
-      const response = await fetch(`/api/frames/${frameId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'mark_as_discontinued',
-        }),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        await loadFrames();
-        alert('Frame marked as discontinued successfully!');
-      } else {
-        throw new Error(result.error || 'Failed to mark as discontinued');
-      }
-    } catch (error) {
-      console.error('Error marking frame as discontinued:', error);
-      alert('Failed to mark frame as discontinued. Please try again.');
-    }
+  const handleRefresh = () => {
+    loadFrames(searchQuery, pagination.page);
   };
 
   return (
@@ -177,7 +169,7 @@ export default function ManageInventoryPage() {
         </p>
       </div>
 
-      {/* Search & Filter */}
+      {/* Search */}
       <div className="bg-white border-2 border-black rounded-lg p-6">
         <form onSubmit={handleSearch} className="space-y-4">
           <div className="flex flex-col md:flex-row gap-4">
@@ -194,21 +186,6 @@ export default function ManageInventoryPage() {
                   autoComplete="off"
                 />
               </div>
-            </div>
-
-            {/* Status Filter */}
-            <div className="w-full md:w-48">
-              <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
-                <SelectTrigger className="border-2 border-black">
-                  <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="All">All Status</SelectItem>
-                  <SelectItem value="Active">Active</SelectItem>
-                  <SelectItem value="Sold">Sold</SelectItem>
-                  <SelectItem value="Discontinued">Discontinued</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
 
             {/* Search Button */}
@@ -234,7 +211,18 @@ export default function ManageInventoryPage() {
                 'Loading...'
               ) : (
                 <>
-                  Found <span className="font-semibold">{frames.length}</span>{' '}
+                  Showing{' '}
+                  <span className="font-semibold">
+                    {pagination.totalCount === 0
+                      ? 0
+                      : (pagination.page - 1) * pagination.limit + 1}
+                    -
+                    {Math.min(
+                      pagination.page * pagination.limit,
+                      pagination.totalCount
+                    )}
+                  </span>{' '}
+                  of <span className="font-semibold">{pagination.totalCount}</span>{' '}
                   frame(s)
                 </>
               )}
@@ -243,13 +231,10 @@ export default function ManageInventoryPage() {
               <Button
                 type="button"
                 variant="ghost"
-                onClick={() => {
-                  setSearchQuery('');
-                  setStatusFilter('All');
-                }}
+                onClick={() => setSearchQuery('')}
                 className="text-sky-deeper hover:text-sky-deeper/80"
               >
-                Clear filters
+                Clear search
               </Button>
             )}
           </div>
@@ -262,12 +247,79 @@ export default function ManageInventoryPage() {
           <Loader2 className="w-8 h-8 animate-spin text-sky-deeper" />
         </div>
       ) : (
-        <FrameTable
-          frames={frames}
-          onEdit={handleEdit}
-          onMarkAsSold={handleMarkAsSold}
-          onMarkAsDiscontinued={handleMarkAsDiscontinued}
-        />
+        <>
+          <FrameTable
+            frames={frames}
+            onEdit={handleEdit}
+            onMarkAsSold={handleMarkAsSold}
+            onRefresh={handleRefresh}
+          />
+
+          {/* Pagination Controls */}
+          {pagination.totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 py-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageChange(pagination.page - 1)}
+                disabled={pagination.page === 1 || isSearching}
+                className="border-2 border-black"
+              >
+                <ChevronLeft className="w-4 h-4 mr-1" />
+                Previous
+              </Button>
+
+              <div className="flex items-center gap-1">
+                {/* Show page numbers */}
+                {Array.from({ length: pagination.totalPages }, (_, i) => i + 1)
+                  .filter((page) => {
+                    // Show first, last, current, and pages near current
+                    return (
+                      page === 1 ||
+                      page === pagination.totalPages ||
+                      Math.abs(page - pagination.page) <= 2
+                    );
+                  })
+                  .map((page, index, array) => {
+                    // Add ellipsis if there's a gap
+                    const showEllipsisBefore =
+                      index > 0 && page - array[index - 1] > 1;
+                    return (
+                      <span key={page} className="flex items-center">
+                        {showEllipsisBefore && (
+                          <span className="px-2 text-gray-400">...</span>
+                        )}
+                        <Button
+                          variant={pagination.page === page ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => handlePageChange(page)}
+                          disabled={isSearching}
+                          className={
+                            pagination.page === page
+                              ? 'bg-sky-deeper hover:bg-sky-deeper/90 text-black border-2 border-black'
+                              : 'border-2 border-black'
+                          }
+                        >
+                          {page}
+                        </Button>
+                      </span>
+                    );
+                  })}
+              </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageChange(pagination.page + 1)}
+                disabled={pagination.page === pagination.totalPages || isSearching}
+                className="border-2 border-black"
+              >
+                Next
+                <ChevronRight className="w-4 h-4 ml-1" />
+              </Button>
+            </div>
+          )}
+        </>
       )}
 
       {/* Edit Modal */}
@@ -288,6 +340,9 @@ export default function ManageInventoryPage() {
                   gender: editingFrame.gender,
                   frameType: editingFrame.frameType,
                   productType: editingFrame.productType,
+                  invoiceDate: editingFrame.invoiceDate
+                    ? editingFrame.invoiceDate.split('T')[0]
+                    : '',
                   costPrice: editingFrame.costPrice,
                   retailPrice: editingFrame.retailPrice,
                   notes: editingFrame.notes || '',

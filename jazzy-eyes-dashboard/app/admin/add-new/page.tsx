@@ -112,14 +112,6 @@ export default function AddNewFramePage() {
               </div>
             </Card>
 
-            <div className="p-4 bg-sky-soft border-2 border-sky-deeper rounded-lg">
-              <p className="font-semibold text-gray-800 mb-1">Next Step:</p>
-              <p className="text-gray-700">
-                Create a label with ID:{' '}
-                <span className="font-bold font-mono">{savedFrame.frameId}</span>
-              </p>
-            </div>
-
             <div className="flex flex-col sm:flex-row gap-3 justify-center pt-4">
               <Button
                 onClick={handleAddAnother}
@@ -162,7 +154,7 @@ export default function AddNewFramePage() {
         </Card>
       )}
 
-      <FrameForm onSubmit={handleSubmit} isLoading={isLoading} />
+      <FrameForm onSubmit={handleSubmit} isLoading={isLoading} submitLabel="Add Frame" />
     </div>
   );
 }

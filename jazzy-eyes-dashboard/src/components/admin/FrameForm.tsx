@@ -221,9 +221,9 @@ export function FrameForm({
             <RadioGroup
               value={frameType}
               onValueChange={(value) =>
-                setValue('frameType', value as 'Zyl' | 'Metal' | 'Rimless')
+                setValue('frameType', value as 'Zyl' | 'Metal' | 'Rimless' | 'Semi-rimless' | 'Clip')
               }
-              className="flex space-x-4"
+              className="flex flex-wrap gap-4"
             >
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="Zyl" id="zyl" />
@@ -241,6 +241,18 @@ export function FrameForm({
                 <RadioGroupItem value="Rimless" id="rimless" />
                 <Label htmlFor="rimless" className="font-normal cursor-pointer">
                   Rimless
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="Semi-rimless" id="semi-rimless" />
+                <Label htmlFor="semi-rimless" className="font-normal cursor-pointer">
+                  Semi-rimless
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="Clip" id="clip" />
+                <Label htmlFor="clip" className="font-normal cursor-pointer">
+                  Clip
                 </Label>
               </div>
             </RadioGroup>

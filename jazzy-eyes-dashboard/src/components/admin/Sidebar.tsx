@@ -3,15 +3,24 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { PlusCircle, Search, BarChart3, X, Store } from 'lucide-react';
+import { PlusCircle, Search, BarChart3, X, Store, Tag, LogOut, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/context/AuthContext';
 
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-const navigation = [
+interface NavItem {
+  name: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  disabled?: boolean;
+  badge?: string;
+}
+
+const navigation: NavItem[] = [
   {
     name: 'Add New Frame',
     href: '/admin/add-new',
@@ -23,16 +32,25 @@ const navigation = [
     icon: Search,
   },
   {
+    name: 'Manage Brands',
+    href: '/admin/brands',
+    icon: Tag,
+  },
+  {
+    name: 'Write-offs',
+    href: '/admin/write-offs',
+    icon: AlertTriangle,
+  },
+  {
     name: 'View Analytics',
     href: '/admin/analytics',
     icon: BarChart3,
-    disabled: true,
-    badge: 'Phase 4',
   },
 ];
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
+  const { logout } = useAuth();
 
   return (
     <>
@@ -108,11 +126,14 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
         {/* Footer */}
         <div className="p-4 border-t-2 border-black flex-shrink-0">
-          <Link href="/">
-            <Button variant="outline" className="w-full border-2 border-black">
-              Back to POS
-            </Button>
-          </Link>
+          <Button
+            variant="outline"
+            className="w-full border-2 border-black"
+            onClick={logout}
+          >
+            <LogOut className="w-4 h-4 mr-2" />
+            Sign Out
+          </Button>
         </div>
       </aside>
     </>

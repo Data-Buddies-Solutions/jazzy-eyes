@@ -13,30 +13,49 @@ model Brand {
   companyId          Int       @map("company_id")
   brandName          String    @unique @map("brand_name") @db.VarChar(255)
   allocationQuantity Int       @map("allocation_quantity")
-  discountPercentage Decimal   @map("discount_percentage") @db.Decimal(5, 2)
   createdAt          DateTime  @default(now()) @map("created_at")
   updatedAt          DateTime  @updatedAt @map("updated_at")
   products           Product[]
 
+  @@index([companyId])
+  @@index([companyName])
   @@map("brands")
+}
+
+model FrameStatus {
+  id           Int       @id @default(autoincrement())
+  name         String    @unique @db.VarChar(50)
+  colorScheme  String    @db.VarChar(20)
+  isProtected  Boolean   @default(false) @map("is_protected")
+  displayOrder Int       @default(0) @map("display_order")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  products     Product[]
+
+  @@index([displayOrder])
+  @@map("frame_statuses")
 }
 
 model Product {
   compositeId  String                 @id @map("composite_id") @db.VarChar(255)
   brandId      Int                    @map("brand_id")
+  statusId     Int?                   @map("status_id")
   styleNumber  String                 @map("style_number") @db.VarChar(100)
   colorCode    String                 @map("color_code") @db.VarChar(50)
   eyeSize      String                 @map("eye_size") @db.VarChar(20)
   gender       String                 @db.VarChar(20)
   frameType    String                 @map("frame_type") @db.VarChar(50)
   productType  String                 @map("product_type") @db.VarChar(20)
+  currentQty   Int                    @default(1) @map("current_qty")
   createdAt    DateTime               @default(now()) @map("created_at")
   updatedAt    DateTime               @updatedAt @map("updated_at")
   transactions InventoryTransaction[]
   brand        Brand                  @relation(fields: [brandId], references: [id])
+  status       FrameStatus?           @relation(fields: [statusId], references: [id])
 
   @@index([brandId])
   @@index([styleNumber])
+  @@index([statusId])
   @@map("products")
 }
 
@@ -52,6 +71,9 @@ model InventoryTransaction {
   unitPrice       Decimal         @map("unit_price") @db.Decimal(10, 2)
   status          String          @default("completed") @db.VarChar(50)
   notes           String?
+  writeOffReason  String?         @map("write_off_reason") @db.VarChar(100)
+  remainingQty    Int?            @map("remaining_qty")
+  revertedFromId  Int?            @map("reverted_from_id")
   createdAt       DateTime        @default(now()) @map("created_at")
   updatedAt       DateTime        @updatedAt @map("updated_at")
   product         Product         @relation(fields: [productId], references: [compositeId])
@@ -66,4 +88,7 @@ model InventoryTransaction {
 enum TransactionType {
   ORDER
   SALE
+  WRITE_OFF
+  RESTOCK
+  REVERT_WRITE_OFF
 }

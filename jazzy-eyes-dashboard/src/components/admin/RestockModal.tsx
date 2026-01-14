@@ -13,101 +13,107 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
 import type { Frame } from '@/types/admin';
-import { Loader2, Minus, Plus } from 'lucide-react';
+import { Loader2, Minus, Plus, Package } from 'lucide-react';
 
-interface ManualSaleModalProps {
+interface RestockModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   frame: Frame;
-  onSubmit: (quantity: number, salePrice?: number, saleDate?: string) => Promise<void>;
+  onSuccess: () => void;
 }
 
-export function ManualSaleModal({
+export function RestockModal({
   open,
   onOpenChange,
   frame,
-}: ManualSaleModalProps & { onSubmit: (quantity: number, salePrice?: number, saleDate?: string) => Promise<void> }) {
+  onSuccess,
+}: RestockModalProps) {
   const [quantity, setQuantity] = useState<number>(1);
-  const [salePrice, setSalePrice] = useState<string>(frame.retailPrice.toString());
-  const [saleDate, setSaleDate] = useState<string>(
+  const [costPrice, setCostPrice] = useState<string>(frame.costPrice.toString());
+  const [invoiceDate, setInvoiceDate] = useState<string>(
     new Date().toISOString().split('T')[0] // Format: YYYY-MM-DD
   );
+  const [notes, setNotes] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const maxQty = frame.currentQty;
-
-  // Reset form when modal opens or frame changes
+  // Reset form when frame changes or modal opens
   useEffect(() => {
     if (open) {
       setQuantity(1);
-      setSalePrice(frame.retailPrice.toString());
-      setSaleDate(new Date().toISOString().split('T')[0]);
+      setCostPrice(frame.costPrice.toString());
+      setInvoiceDate(new Date().toISOString().split('T')[0]);
+      setNotes('');
     }
-  }, [open, frame.frameId, frame.retailPrice]);
+  }, [open, frame.frameId, frame.costPrice]);
 
   const handleQuantityChange = (delta: number) => {
     const newQty = quantity + delta;
-    if (newQty >= 1 && newQty <= maxQty) {
+    if (newQty >= 1 && newQty <= 999) {
       setQuantity(newQty);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (quantity < 1) {
+      toast.error('Quantity must be at least 1');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      const price = parseFloat(salePrice);
-      const finalPrice = price !== frame.retailPrice ? price : undefined;
-
-      // Convert date to ISO string for the API
-      const dateObj = new Date(saleDate);
-      const finalDate = dateObj.toISOString();
-
-      // Call the parent's onSubmit with quantity
       const response = await fetch(`/api/frames/${frame.frameId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'mark_as_sold',
+          action: 'restock',
           quantity,
-          salePrice: finalPrice,
-          saleDate: finalDate,
+          costPrice: parseFloat(costPrice),
+          invoiceDate: new Date(invoiceDate).toISOString(),
+          notes: notes.trim() || undefined,
         }),
       });
 
       const result = await response.json();
 
       if (result.success) {
-        toast.success(result.message || `Sold ${quantity} unit(s) successfully!`);
+        toast.success(result.message || `Restocked ${quantity} unit(s) successfully!`);
         onOpenChange(false);
         // Reset form
         setQuantity(1);
-        // Trigger a page refresh or callback to reload frames
-        window.location.reload();
+        setCostPrice(frame.costPrice.toString());
+        setNotes('');
+        onSuccess();
       } else {
-        throw new Error(result.error || 'Failed to record sale');
+        throw new Error(result.error || 'Failed to restock');
       }
     } catch (error) {
-      console.error('Error recording sale:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to record sale. Please try again.');
+      console.error('Error restocking frame:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to restock. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const totalSaleAmount = parseFloat(salePrice) * quantity;
+  const newStockLevel = frame.currentQty + quantity;
+  const totalInventoryValue = parseFloat(costPrice) * quantity;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px] border-2 border-black">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle className="text-2xl">Sell Frame</DialogTitle>
+            <DialogTitle className="text-2xl flex items-center gap-2">
+              <Package className="h-6 w-6 text-green-600" />
+              Restock Frame
+            </DialogTitle>
             <DialogDescription>
-              Record a sale for this frame. Select the quantity and enter sale details.
+              Add more units of this frame to inventory. Enter the quantity and cost from your supplier invoice.
             </DialogDescription>
           </DialogHeader>
 
@@ -127,18 +133,14 @@ export function ManualSaleModal({
                   <span className="text-sm text-gray-600">Model:</span>
                   <span className="font-semibold">{frame.styleNumber}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Color:</span>
-                  <span>{frame.colorCode}</span>
-                </div>
                 <div className="flex justify-between border-t pt-2">
-                  <span className="text-sm text-gray-600">Available Stock:</span>
+                  <span className="text-sm text-gray-600">Current Stock:</span>
                   <span className="font-semibold">{frame.currentQty} unit(s)</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Retail Price:</span>
+                  <span className="text-sm text-gray-600">Last Cost Price:</span>
                   <span className="font-semibold">
-                    ${frame.retailPrice.toFixed(2)}
+                    ${frame.costPrice.toFixed(2)}
                   </span>
                 </div>
               </div>
@@ -146,7 +148,7 @@ export function ManualSaleModal({
 
             {/* Quantity Selector */}
             <div className="space-y-2">
-              <Label>Quantity to Sell</Label>
+              <Label>Quantity to Add</Label>
               <div className="flex items-center gap-3">
                 <Button
                   type="button"
@@ -163,12 +165,12 @@ export function ManualSaleModal({
                   value={quantity}
                   onChange={(e) => {
                     const val = parseInt(e.target.value);
-                    if (!isNaN(val) && val >= 1 && val <= maxQty) {
+                    if (!isNaN(val) && val >= 1 && val <= 999) {
                       setQuantity(val);
                     }
                   }}
                   min={1}
-                  max={maxQty}
+                  max={999}
                   className="border-2 border-black text-center w-20"
                 />
                 <Button
@@ -176,67 +178,82 @@ export function ManualSaleModal({
                   variant="outline"
                   size="icon"
                   onClick={() => handleQuantityChange(1)}
-                  disabled={quantity >= maxQty}
+                  disabled={quantity >= 999}
                   className="border-2 border-black h-10 w-10"
                 >
                   <Plus className="h-4 w-4" />
                 </Button>
-                <span className="text-sm text-gray-500">
-                  of {maxQty} available
-                </span>
               </div>
             </div>
 
-            {/* Sale Price Override */}
+            {/* Cost Price */}
             <div className="space-y-2">
-              <Label htmlFor="salePrice">
-                Sale Price per Unit (Optional Override)
-              </Label>
+              <Label htmlFor="costPrice">Cost Price per Unit</Label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
                   $
                 </span>
                 <Input
-                  id="salePrice"
+                  id="costPrice"
                   type="number"
                   step="0.01"
-                  value={salePrice}
-                  onChange={(e) => setSalePrice(e.target.value)}
+                  value={costPrice}
+                  onChange={(e) => setCostPrice(e.target.value)}
                   className="border-2 border-black pl-7"
                 />
               </div>
               <p className="text-xs text-gray-500">
-                Leave as retail price or enter a different amount if the frame
-                was sold at a discount or premium.
+                Defaults to last cost price. Update if supplier price has changed.
               </p>
             </div>
 
-            {/* Sale Date */}
+            {/* Invoice Date */}
             <div className="space-y-2">
-              <Label htmlFor="saleDate">Sale Date</Label>
+              <Label htmlFor="invoiceDate">Invoice Date</Label>
               <Input
-                id="saleDate"
+                id="invoiceDate"
                 type="date"
-                value={saleDate}
-                onChange={(e) => setSaleDate(e.target.value)}
+                value={invoiceDate}
+                onChange={(e) => setInvoiceDate(e.target.value)}
                 className="border-2 border-black"
               />
               <p className="text-xs text-gray-500">
-                Defaults to today but can be changed if needed
+                Date on the supplier invoice
               </p>
             </div>
 
-            {/* Total Sale Amount */}
-            <Card className="p-4 border-2 border-black bg-green-50">
-              <div className="flex justify-between items-center">
-                <span className="font-semibold">Total Sale Amount:</span>
-                <span className="text-xl font-bold text-green-700">
-                  ${totalSaleAmount.toFixed(2)}
-                </span>
+            {/* Notes */}
+            <div className="space-y-2">
+              <Label htmlFor="notes">Notes (Optional)</Label>
+              <Textarea
+                id="notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="e.g., Invoice #12345, PO #67890"
+                className="border-2 border-black"
+                rows={2}
+              />
+            </div>
+
+            {/* Summary */}
+            <Card className="p-4 border-2 border-green-300 bg-green-50">
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="font-semibold">New Stock Level:</span>
+                  <span className="text-xl font-bold text-green-700">
+                    {newStockLevel} unit(s)
+                  </span>
+                </div>
+                <div className="flex justify-between items-center border-t pt-2">
+                  <span className="text-sm text-gray-600">Inventory Value Added:</span>
+                  <span className="font-semibold">
+                    ${totalInventoryValue.toFixed(2)}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500">
+                  {quantity} unit(s) x ${parseFloat(costPrice).toFixed(2)}
+                </p>
               </div>
-              <p className="text-xs text-gray-500 mt-1">
-                {quantity} unit(s) x ${parseFloat(salePrice).toFixed(2)}
-              </p>
             </Card>
           </div>
 
@@ -252,16 +269,16 @@ export function ManualSaleModal({
             </Button>
             <Button
               type="submit"
-              disabled={isLoading || quantity < 1 || quantity > maxQty}
-              className="bg-sky-deeper hover:bg-sky-deeper/90 text-black font-semibold border-2 border-black"
+              disabled={isLoading || quantity < 1}
+              className="bg-green-600 hover:bg-green-700 text-white font-semibold border-2 border-green-800"
             >
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Recording...
+                  Processing...
                 </>
               ) : (
-                `Confirm Sale (${quantity} unit${quantity > 1 ? 's' : ''})`
+                `Restock ${quantity} Unit${quantity > 1 ? 's' : ''}`
               )}
             </Button>
           </DialogFooter>

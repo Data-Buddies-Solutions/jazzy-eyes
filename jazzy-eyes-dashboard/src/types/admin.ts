@@ -11,15 +11,19 @@ export interface Frame {
   colorCode: string;
   eyeSize: string;
   gender: 'Men' | 'Women' | 'Unisex';
-  frameType: 'Zyl' | 'Metal' | 'Rimless';
+  frameType: 'Zyl' | 'Metal' | 'Rimless' | 'Semi-rimless' | 'Clip';
   productType: 'Optical' | 'Sunglasses';
+  invoiceDate?: string;
   costPrice: number;
   retailPrice: number;
-  status: 'Active' | 'Sold' | 'Discontinued';
+  status: string;
+  statusId?: number;
+  statusColorScheme?: string;
   dateAdded: string;
   notes: string | null;
   saleDate?: string;
   salePrice?: number;
+  currentQty: number;
 }
 
 export interface FrameFormData {
@@ -28,7 +32,7 @@ export interface FrameFormData {
   colorCode: string;
   eyeSize: string;
   gender: 'Men' | 'Women' | 'Unisex';
-  frameType: 'Zyl' | 'Metal' | 'Rimless';
+  frameType: 'Zyl' | 'Metal' | 'Rimless' | 'Semi-rimless' | 'Clip';
   productType: 'Optical' | 'Sunglasses';
   invoiceDate?: string;
   costPrice: number;
@@ -45,11 +49,107 @@ export interface AddFrameResponse {
 
 export interface ManualSaleData {
   frameId: string;
+  quantity: number;
   salePrice?: number;
   saleDate?: string;
+}
+
+export type WriteOffReason = 'damaged' | 'lost' | 'defective' | 'other';
+
+export interface WriteOffData {
+  frameId: string;
+  quantity: number;
+  reason: WriteOffReason;
+  notes?: string;
+}
+
+export interface RevertWriteOffData {
+  frameId: string;
+  writeOffTransactionId: number;
+  notes?: string;
+}
+
+export interface RestockData {
+  frameId: string;
+  quantity: number;
+  invoiceDate?: string;
+  costPrice?: number;
+  notes?: string;
+}
+
+export interface InventoryTransactionRecord {
+  id: number;
+  transactionType: 'ORDER' | 'SALE' | 'WRITE_OFF' | 'RESTOCK' | 'REVERT_WRITE_OFF';
+  transactionDate: string;
+  quantity: number;
+  unitCost: number;
+  unitPrice: number;
+  notes: string | null;
+  writeOffReason: string | null;
+  remainingQty: number | null;
+  revertedFromId: number | null;
+  isReverted?: boolean;
 }
 
 export interface SearchFilters {
   query: string;
   status: 'All' | 'Active' | 'Sold' | 'Discontinued';
+}
+
+// Brand Management Types
+export interface BrandWithDetails extends Brand {
+  allocationQuantity: number;
+  companyId: number;
+  productCount: number;
+}
+
+export interface CompanyGroup {
+  companyName: string;
+  companyId: number;
+  brands: BrandWithDetails[];
+  totalBrands: number;
+  totalAllocation: number;
+}
+
+export interface CreateCompanyData {
+  companyName: string;
+}
+
+export interface CreateBrandData {
+  brandId: number;
+  companyName: string;
+  companyId: number;
+  brandName: string;
+  allocationQuantity: number;
+}
+
+export interface UpdateBrandData {
+  id?: number;
+  brandName?: string;
+  allocationQuantity?: number;
+}
+
+export interface UpdateCompanyData {
+  companyName: string;
+}
+
+// Frame Status Management Types
+export interface FrameStatus {
+  id: number;
+  name: string;
+  colorScheme: 'green' | 'blue' | 'gray' | 'red' | 'yellow' | 'purple' | 'orange' | 'pink';
+  isProtected: boolean;
+  displayOrder: number;
+  productCount: number;
+}
+
+export interface CreateStatusData {
+  name: string;
+  colorScheme: 'green' | 'blue' | 'gray' | 'red' | 'yellow' | 'purple' | 'orange' | 'pink';
+}
+
+export interface UpdateStatusData {
+  name?: string;
+  colorScheme?: 'green' | 'blue' | 'gray' | 'red' | 'yellow' | 'purple' | 'orange' | 'pink';
+  displayOrder?: number;
 }
