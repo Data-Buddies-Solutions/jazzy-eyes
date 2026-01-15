@@ -16,6 +16,7 @@ model Brand {
   createdAt          DateTime  @default(now()) @map("created_at")
   updatedAt          DateTime  @updatedAt @map("updated_at")
   products           Product[]
+  rxSales            RxSale[]
 
   @@index([companyId])
   @@index([companyName])
@@ -91,4 +92,26 @@ enum TransactionType {
   WRITE_OFF
   RESTOCK
   REVERT_WRITE_OFF
+}
+
+model RxSale {
+  id          Int      @id @default(autoincrement())
+  brandId     Int      @map("brand_id")
+  styleNumber String   @map("style_number") @db.VarChar(100)
+  colorCode   String   @map("color_code") @db.VarChar(50)
+  eyeSize     String   @map("eye_size") @db.VarChar(20)
+  gender      String   @db.VarChar(20)
+  frameType   String   @map("frame_type") @db.VarChar(50)
+  productType String   @map("product_type") @db.VarChar(20)
+  saleDate    DateTime @map("sale_date") @db.Date
+  salePrice   Decimal  @map("sale_price") @db.Decimal(10, 2)
+  costPrice   Decimal  @default(0) @map("cost_price") @db.Decimal(10, 2)
+  notes       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  brand       Brand    @relation(fields: [brandId], references: [id])
+
+  @@index([brandId])
+  @@index([saleDate])
+  @@map("rx_sales")
 }

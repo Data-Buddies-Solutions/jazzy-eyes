@@ -36,6 +36,7 @@ const WRITE_OFF_REASONS: { value: WriteOffReason; label: string }[] = [
   { value: 'damaged', label: 'Damaged' },
   { value: 'lost', label: 'Lost/Missing' },
   { value: 'defective', label: 'Defective' },
+  { value: 'return', label: 'Return (No Cost)' },
   { value: 'other', label: 'Other' },
 ];
 
@@ -102,7 +103,8 @@ export function WriteOffModal({
     }
   };
 
-  const totalLossAmount = frame.costPrice * quantity;
+  const isReturn = reason === 'return';
+  const totalLossAmount = isReturn ? 0 : frame.costPrice * quantity;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -221,15 +223,18 @@ export function WriteOffModal({
             </div>
 
             {/* Total Loss Amount */}
-            <Card className="p-4 border-2 border-red-300 bg-red-50">
+            <Card className={`p-4 border-2 ${isReturn ? 'border-blue-300 bg-blue-50' : 'border-red-300 bg-red-50'}`}>
               <div className="flex justify-between items-center">
-                <span className="font-semibold">Total Loss (at cost):</span>
-                <span className="text-xl font-bold text-red-700">
+                <span className="font-semibold">{isReturn ? 'Cost Impact:' : 'Total Loss (at cost):'}</span>
+                <span className={`text-xl font-bold ${isReturn ? 'text-blue-700' : 'text-red-700'}`}>
                   ${totalLossAmount.toFixed(2)}
                 </span>
               </div>
               <p className="text-xs text-gray-500 mt-1">
-                {quantity} unit(s) x ${frame.costPrice.toFixed(2)} cost
+                {isReturn
+                  ? `${quantity} unit(s) returned - no cost recorded`
+                  : `${quantity} unit(s) x $${frame.costPrice.toFixed(2)} cost`
+                }
               </p>
             </Card>
           </div>

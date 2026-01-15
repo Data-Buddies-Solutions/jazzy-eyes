@@ -54,7 +54,7 @@ export interface ManualSaleData {
   saleDate?: string;
 }
 
-export type WriteOffReason = 'damaged' | 'lost' | 'defective' | 'other';
+export type WriteOffReason = 'damaged' | 'lost' | 'defective' | 'return' | 'other';
 
 export interface WriteOffData {
   frameId: string;

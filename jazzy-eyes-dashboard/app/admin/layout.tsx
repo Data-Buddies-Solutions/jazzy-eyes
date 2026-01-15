@@ -10,14 +10,14 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="bg-white flex" style={{ minHeight: 'calc(100vh / 0.8)' }}>
+    <div className="bg-white flex min-h-screen">
       {/* Sidebar */}
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Mobile Header */}
-        <header className="lg:hidden border-b-2 border-black px-4 py-4">
+        {/* Header */}
+        <header className="border-b-2 border-black px-4 py-4">
           <div className="flex items-center justify-between">
             <h1 className="text-xl font-bold">Admin Portal</h1>
             <Button

@@ -17,10 +17,11 @@ An inventory management and admin portal for Jazzy Eyes optical business. Built 
 ### Admin Portal (`/admin`)
 
 - **Add New Frame** - Add frames to inventory with brand, model, color, sizing, and pricing
-- **Manage Inventory** - Search, filter, edit frames and record sales
+- **Sell Prescription (RX)** - Record prescription sales without affecting inventory (tracked separately for analytics)
+- **Manage Inventory** - Search, filter, edit frames and record sales (supports search by brand or color)
 - **Analytics** - View sales trends, brand performance, margins, and inventory health
 - **Brand Management** - Manage brands and company allocations
-- **Write-offs** - Track and manage inventory write-offs
+- **Write-offs** - Track and manage inventory write-offs with multiple reasons (damaged, lost, defective, return)
 
 ### Inventory Management
 
@@ -35,6 +36,7 @@ An inventory management and admin portal for Jazzy Eyes optical business. Built 
 - **Product** - Frame inventory with style, color, sizing, and current quantity
 - **FrameStatus** - Configurable status labels (Active, Sold, Discontinued, etc.)
 - **InventoryTransaction** - Complete audit trail of all inventory movements
+- **RxSale** - Prescription sales records (independent from inventory)
 
 ## Getting Started
 
@@ -97,11 +99,13 @@ jazzy-eyes-dashboard/
 │   │   ├── analytics/      # Analytics dashboard
 │   │   ├── brands/         # Brand management
 │   │   ├── manage/         # Inventory management
+│   │   ├── sell-rx/        # Prescription sales
 │   │   └── write-offs/     # Write-off tracking
 │   ├── api/                # API routes
 │   │   ├── analytics/      # Analytics endpoints
 │   │   ├── brands/         # Brand CRUD
 │   │   ├── frames/         # Frame CRUD and search
+│   │   ├── rx-sales/       # RX sales endpoints
 │   │   ├── statuses/       # Status management
 │   │   └── write-offs/     # Write-off endpoints
 │   └── page.tsx            # Login page
@@ -157,6 +161,10 @@ The dashboard uses a consistent design system:
 - `GET /api/brands/[id]` - Get brand details
 - `PUT /api/brands/[id]` - Update brand
 - `DELETE /api/brands/[id]` - Delete brand
+
+### RX Sales
+- `GET /api/rx-sales` - List all RX sales
+- `POST /api/rx-sales` - Record a new RX sale
 
 ### Analytics
 - `GET /api/analytics/sales-trends` - Sales trends data

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { PlusCircle, Search, BarChart3, X, Store, Tag, LogOut, AlertTriangle } from 'lucide-react';
+import { PlusCircle, Search, BarChart3, X, Store, Tag, LogOut, AlertTriangle, Glasses } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/AuthContext';
 
@@ -25,6 +25,11 @@ const navigation: NavItem[] = [
     name: 'Add New Frame',
     href: '/admin/add-new',
     icon: PlusCircle,
+  },
+  {
+    name: 'Sell Prescription',
+    href: '/admin/sell-rx',
+    icon: Glasses,
   },
   {
     name: 'Manage Inventory',
@@ -54,10 +59,10 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   return (
     <>
-      {/* Mobile overlay */}
+      {/* Overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          className="fixed inset-0 bg-black/50 z-40"
           onClick={onClose}
           aria-hidden="true"
         />
@@ -66,21 +71,20 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed top-0 left-0 z-50 w-64 bg-white border-r-2 border-black transition-transform duration-300 lg:translate-x-0 lg:static lg:z-0 flex flex-col',
-          isOpen ? 'translate-x-0' : '-translate-x-full'
+          'fixed top-0 right-0 z-50 w-72 bg-white border-l-2 border-black transition-transform duration-300 flex flex-col',
+          isOpen ? 'translate-x-0' : 'translate-x-full'
         )}
-        style={{ height: 'calc(100vh / 0.8)' }}
+        style={{ height: '100vh' }}
       >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b-2 border-black flex-shrink-0">
           <div className="flex items-center space-x-2">
             <Store className="w-6 h-6 text-sky-deeper" />
-            <h2 className="text-lg font-bold">Jazzy Eyes Admin</h2>
+            <h2 className="text-lg font-bold">Menu</h2>
           </div>
           <Button
             variant="ghost"
             size="icon"
-            className="lg:hidden"
             onClick={onClose}
           >
             <X className="w-5 h-5" />
@@ -126,7 +130,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         </nav>
 
         {/* Footer */}
-        <div className="p-4 border-y-2 border-black flex-shrink-0">
+        <div className="p-4 border-t-2 border-black flex-shrink-0">
           <Button
             variant="outline"
             className="w-full border-2 border-black"

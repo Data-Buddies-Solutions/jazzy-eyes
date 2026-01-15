@@ -25,8 +25,11 @@ interface Pagination {
 
 type StatusFilter = 'All' | 'Active' | 'Sold Out' | 'Discontinued';
 
+type SearchMode = 'brand' | 'color';
+
 export default function ManageInventoryPage() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchMode, setSearchMode] = useState<SearchMode>('brand');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('All');
   const [frames, setFrames] = useState<Frame[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -41,15 +44,18 @@ export default function ManageInventoryPage() {
     totalPages: 0,
   });
 
-  const loadFrames = async (query?: string, page: number = 1, status?: StatusFilter) => {
+  const loadFrames = async (query?: string, page: number = 1, status?: StatusFilter, mode?: SearchMode) => {
     setIsSearching(true);
     try {
       const currentStatus = status !== undefined ? status : statusFilter;
+      const currentMode = mode !== undefined ? mode : searchMode;
+      const currentQuery = query !== undefined ? query : searchQuery;
       const params = new URLSearchParams({
-        query: query !== undefined ? query : searchQuery,
+        query: currentQuery,
         page: page.toString(),
         limit: '20',
         status: currentStatus,
+        searchMode: currentMode,
       });
       const response = await fetch(`/api/frames/search?${params}`);
       const data = await response.json();
@@ -72,12 +78,12 @@ export default function ManageInventoryPage() {
   // Debounced live search - reset to page 1 on new search
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      loadFrames(searchQuery, 1, statusFilter);
+      loadFrames(searchQuery, 1, statusFilter, searchMode);
     }, 300); // 300ms delay after user stops typing
 
     return () => clearTimeout(timeoutId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, statusFilter]);
+  }, [searchQuery, statusFilter, searchMode]);
 
   useEffect(() => {
     loadFrames();
@@ -86,15 +92,20 @@ export default function ManageInventoryPage() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    loadFrames(searchQuery, 1, statusFilter);
+    loadFrames(searchQuery, 1, statusFilter, searchMode);
   };
 
   const handlePageChange = (newPage: number) => {
-    loadFrames(searchQuery, newPage, statusFilter);
+    loadFrames(searchQuery, newPage, statusFilter, searchMode);
   };
 
   const handleStatusFilter = (status: StatusFilter) => {
     setStatusFilter(status);
+  };
+
+  const toggleSearchMode = () => {
+    setSearchMode((prev) => (prev === 'brand' ? 'color' : 'brand'));
+    setSearchQuery(''); // Clear search when switching modes
   };
 
   const handleEdit = (frame: Frame) => {
@@ -171,7 +182,7 @@ export default function ManageInventoryPage() {
   };
 
   const handleRefresh = () => {
-    loadFrames(searchQuery, pagination.page, statusFilter);
+    loadFrames(searchQuery, pagination.page, statusFilter, searchMode);
   };
 
   return (
@@ -187,13 +198,31 @@ export default function ManageInventoryPage() {
       <div className="bg-white border-2 border-black rounded-lg p-6">
         <form onSubmit={handleSearch} className="space-y-4">
           <div className="flex flex-col md:flex-row gap-4">
+            {/* Search Mode Toggle */}
+            <Button
+              type="button"
+              onClick={toggleSearchMode}
+              variant={searchMode === 'color' ? 'default' : 'outline'}
+              className={
+                searchMode === 'color'
+                  ? 'bg-sky-deeper hover:bg-sky-deeper/90 text-black font-semibold border-2 border-black whitespace-nowrap'
+                  : 'border-2 border-black whitespace-nowrap'
+              }
+            >
+              {searchMode === 'color' ? 'Search by Color' : 'Search by Brand'}
+            </Button>
+
             {/* Search Bar */}
             <div className="flex-1">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <Input
                   type="text"
-                  placeholder="Search by Frame ID, brand, or model... (e.g., 1-GG)"
+                  placeholder={
+                    searchMode === 'color'
+                      ? "Search by color code... (e.g., BLK, BRN)"
+                      : "Search by Frame ID, brand, or model... (e.g., 1-GG)"
+                  }
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="border-2 border-black pl-10"

@@ -43,6 +43,7 @@ const WRITE_OFF_REASON_LABELS: Record<string, string> = {
   damaged: 'Damaged',
   lost: 'Lost/Missing',
   defective: 'Defective',
+  return: 'Return',
   other: 'Other',
 };
 

@@ -33,7 +33,7 @@ export const writeOffSchema = z.object({
     .number()
     .int()
     .min(1, 'Quantity must be at least 1'),
-  reason: z.enum(['damaged', 'lost', 'defective', 'other'], {
+  reason: z.enum(['damaged', 'lost', 'defective', 'return', 'other'], {
     message: 'Please select a reason',
   }),
   notes: z.string().optional(),

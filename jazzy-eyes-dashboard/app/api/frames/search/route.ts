@@ -6,6 +6,7 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const query = searchParams.get('query') || '';
     const statusFilter = searchParams.get('status') || 'All';
+    const searchMode = searchParams.get('searchMode') || 'brand';
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
     const skip = (page - 1) * limit;
@@ -13,30 +14,39 @@ export async function GET(request: NextRequest) {
     // Build where clause
     const where: any = {};
 
-    // Search by frame ID (composite ID), brand name, or style number
+    // Search based on mode
     if (query) {
-      where.OR = [
-        {
-          compositeId: {
-            startsWith: query,
-            mode: 'insensitive',
+      if (searchMode === 'color') {
+        // Search by color code only
+        where.colorCode = {
+          contains: query,
+          mode: 'insensitive',
+        };
+      } else {
+        // Default: Search by frame ID (composite ID), brand name, or style number
+        where.OR = [
+          {
+            compositeId: {
+              startsWith: query,
+              mode: 'insensitive',
+            },
           },
-        },
-        {
-          brand: {
-            brandName: {
+          {
+            brand: {
+              brandName: {
+                contains: query,
+                mode: 'insensitive',
+              },
+            },
+          },
+          {
+            styleNumber: {
               contains: query,
               mode: 'insensitive',
             },
           },
-        },
-        {
-          styleNumber: {
-            contains: query,
-            mode: 'insensitive',
-          },
-        },
-      ];
+        ];
+      }
     }
 
     // Add status filter to where clause if specified

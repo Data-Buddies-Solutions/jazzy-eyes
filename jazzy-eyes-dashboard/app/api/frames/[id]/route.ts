@@ -394,7 +394,7 @@ export async function PATCH(
       }
 
       // Validate reason
-      const validReasons = ['damaged', 'lost', 'defective', 'other'];
+      const validReasons = ['damaged', 'lost', 'defective', 'return', 'other'];
       if (!reason || !validReasons.includes(reason)) {
         return NextResponse.json(
           { success: false, error: 'A valid reason is required for write-off' },
@@ -402,8 +402,14 @@ export async function PATCH(
         );
       }
 
-      // Get the cost for the write-off (FIFO)
-      const { avgCost } = await consumeFIFOInventory(compositeId, quantity);
+      // Get the cost for the write-off
+      // For 'return' reason, use $0 cost (no FIFO consumption)
+      // For other reasons, use FIFO cost
+      let avgCost = 0;
+      if (reason !== 'return') {
+        const fifoResult = await consumeFIFOInventory(compositeId, quantity);
+        avgCost = fifoResult.avgCost;
+      }
 
       const newQty = existingProduct.currentQty - quantity;
 
