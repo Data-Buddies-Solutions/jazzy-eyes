@@ -41,6 +41,16 @@ export async function GET(
   }
 }
 
+// Generate compositeId in format: {brandId}-{styleNumber}-{colorCode}-{eyeSize}
+function generateCompositeId(
+  brandId: number,
+  styleNumber: string,
+  colorCode: string,
+  eyeSize: string
+): string {
+  return `${brandId}-${styleNumber}-${colorCode}-${eyeSize}`;
+}
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -63,25 +73,93 @@ export async function PUT(
       );
     }
 
-    // Update product fields that can be changed
-    const updatedProduct = await prisma.product.update({
-      where: { compositeId },
-      data: {
-        brandId: body.brandId !== undefined ? body.brandId : existingProduct.brandId,
-        styleNumber: body.styleNumber !== undefined ? body.styleNumber : existingProduct.styleNumber,
-        colorCode: body.colorCode !== undefined ? body.colorCode : existingProduct.colorCode,
-        eyeSize: body.eyeSize !== undefined ? body.eyeSize : existingProduct.eyeSize,
-        gender: body.gender !== undefined ? body.gender : existingProduct.gender,
-        frameType: body.frameType !== undefined ? body.frameType : existingProduct.frameType,
-        productType: body.productType !== undefined ? body.productType : existingProduct.productType,
-      },
-    });
+    // Determine new field values
+    const newBrandId = body.brandId !== undefined ? body.brandId : existingProduct.brandId;
+    const newStyleNumber = body.styleNumber !== undefined ? body.styleNumber : existingProduct.styleNumber;
+    const newColorCode = body.colorCode !== undefined ? body.colorCode : existingProduct.colorCode;
+    const newEyeSize = body.eyeSize !== undefined ? body.eyeSize : existingProduct.eyeSize;
+    const newGender = body.gender !== undefined ? body.gender : existingProduct.gender;
+    const newFrameType = body.frameType !== undefined ? body.frameType : existingProduct.frameType;
+    const newProductType = body.productType !== undefined ? body.productType : existingProduct.productType;
+
+    // Check if any ID-related fields changed
+    const newCompositeId = generateCompositeId(newBrandId, newStyleNumber, newColorCode, newEyeSize);
+    const idChanged = newCompositeId !== compositeId;
+
+    let updatedProduct;
+
+    if (idChanged) {
+      // Check if new ID already exists
+      const existingWithNewId = await prisma.product.findUnique({
+        where: { compositeId: newCompositeId },
+      });
+
+      if (existingWithNewId) {
+        return NextResponse.json(
+          { success: false, error: `A frame with ID ${newCompositeId} already exists` },
+          { status: 409 }
+        );
+      }
+
+      // Migrate to new composite ID using transaction
+      await prisma.$transaction(async (tx) => {
+        // 1. Create new product with new composite ID
+        await tx.product.create({
+          data: {
+            compositeId: newCompositeId,
+            brandId: newBrandId,
+            statusId: existingProduct.statusId,
+            styleNumber: newStyleNumber,
+            colorCode: newColorCode,
+            eyeSize: newEyeSize,
+            gender: newGender,
+            frameType: newFrameType,
+            productType: newProductType,
+            currentQty: existingProduct.currentQty,
+            createdAt: existingProduct.createdAt,
+          },
+        });
+
+        // 2. Update all transactions to point to new ID
+        await tx.inventoryTransaction.updateMany({
+          where: { productId: compositeId },
+          data: { productId: newCompositeId },
+        });
+
+        // 3. Delete old product
+        await tx.product.delete({
+          where: { compositeId },
+        });
+      });
+
+      // Fetch the updated product
+      updatedProduct = await prisma.product.findUnique({
+        where: { compositeId: newCompositeId },
+        include: { transactions: true },
+      });
+    } else {
+      // No ID change, simple update
+      updatedProduct = await prisma.product.update({
+        where: { compositeId },
+        data: {
+          brandId: newBrandId,
+          styleNumber: newStyleNumber,
+          colorCode: newColorCode,
+          eyeSize: newEyeSize,
+          gender: newGender,
+          frameType: newFrameType,
+          productType: newProductType,
+        },
+      });
+    }
 
     // If cost/retail prices or invoice info changed, update the latest ORDER transaction
     if (body.costPrice !== undefined || body.retailPrice !== undefined || body.notes !== undefined || body.invoiceDate !== undefined) {
-      const latestOrder = existingProduct.transactions.find(
-        (t) => t.transactionType === 'ORDER'
-      );
+      const productIdForTransaction = idChanged ? newCompositeId : compositeId;
+      const latestOrder = await prisma.inventoryTransaction.findFirst({
+        where: { productId: productIdForTransaction, transactionType: 'ORDER' },
+        orderBy: { transactionDate: 'desc' },
+      });
 
       if (latestOrder) {
         await prisma.inventoryTransaction.update({
@@ -98,8 +176,11 @@ export async function PUT(
 
     return NextResponse.json({
       success: true,
-      message: 'Frame updated successfully',
+      message: idChanged
+        ? `Frame updated successfully. ID changed from ${compositeId} to ${newCompositeId}`
+        : 'Frame updated successfully',
       product: updatedProduct,
+      newCompositeId: idChanged ? newCompositeId : undefined,
     });
   } catch (error) {
     console.error('Error updating frame:', error);
@@ -477,7 +558,9 @@ export async function PATCH(
 
       // Get cost price (use provided or default to latest)
       const finalCostPrice = costPrice !== undefined ? costPrice : await getLatestCostPrice(compositeId);
-      const finalInvoiceDate = invoiceDate ? new Date(invoiceDate) : new Date();
+      // Use invoice date for transaction date if provided (for backlog entries)
+      const finalInvoiceDate = invoiceDate ? new Date(invoiceDate) : null;
+      const transactionDate = finalInvoiceDate || new Date();
       const retailPrice = await getRetailPrice(compositeId);
 
       const newQty = existingProduct.currentQty + quantity;
@@ -497,7 +580,7 @@ export async function PATCH(
           data: {
             productId: compositeId,
             transactionType: 'RESTOCK',
-            transactionDate: new Date(),
+            transactionDate,
             invoiceDate: finalInvoiceDate,
             quantity,
             unitCost: finalCostPrice,

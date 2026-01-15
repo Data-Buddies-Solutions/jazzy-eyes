@@ -23,8 +23,11 @@ interface Pagination {
   totalPages: number;
 }
 
+type StatusFilter = 'All' | 'Active' | 'Sold Out' | 'Discontinued';
+
 export default function ManageInventoryPage() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('All');
   const [frames, setFrames] = useState<Frame[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
@@ -38,13 +41,15 @@ export default function ManageInventoryPage() {
     totalPages: 0,
   });
 
-  const loadFrames = async (query?: string, page: number = 1) => {
+  const loadFrames = async (query?: string, page: number = 1, status?: StatusFilter) => {
     setIsSearching(true);
     try {
+      const currentStatus = status !== undefined ? status : statusFilter;
       const params = new URLSearchParams({
         query: query !== undefined ? query : searchQuery,
         page: page.toString(),
         limit: '20',
+        status: currentStatus,
       });
       const response = await fetch(`/api/frames/search?${params}`);
       const data = await response.json();
@@ -67,12 +72,12 @@ export default function ManageInventoryPage() {
   // Debounced live search - reset to page 1 on new search
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      loadFrames(searchQuery, 1);
+      loadFrames(searchQuery, 1, statusFilter);
     }, 300); // 300ms delay after user stops typing
 
     return () => clearTimeout(timeoutId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery]);
+  }, [searchQuery, statusFilter]);
 
   useEffect(() => {
     loadFrames();
@@ -81,11 +86,15 @@ export default function ManageInventoryPage() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    loadFrames(searchQuery, 1);
+    loadFrames(searchQuery, 1, statusFilter);
   };
 
   const handlePageChange = (newPage: number) => {
-    loadFrames(searchQuery, newPage);
+    loadFrames(searchQuery, newPage, statusFilter);
+  };
+
+  const handleStatusFilter = (status: StatusFilter) => {
+    setStatusFilter(status);
   };
 
   const handleEdit = (frame: Frame) => {
@@ -109,8 +118,13 @@ export default function ManageInventoryPage() {
       if (result.success) {
         setEditModalOpen(false);
         setEditingFrame(null);
-        await loadFrames();
-        toast.success('Frame updated successfully!');
+        await loadFrames(searchQuery, pagination.page, statusFilter);
+        // Show the backend message which includes ID change info
+        toast.success(result.message || 'Frame updated successfully!');
+        // If ID changed, also show the new ID
+        if (result.newCompositeId) {
+          console.log('Frame ID changed to:', result.newCompositeId);
+        }
       } else {
         throw new Error(result.error || 'Failed to update frame');
       }
@@ -143,7 +157,7 @@ export default function ManageInventoryPage() {
       const result = await response.json();
 
       if (result.success) {
-        await loadFrames();
+        await loadFrames(searchQuery, pagination.page, statusFilter);
         toast.success(result.message || `Sold ${quantity} unit(s) successfully!`);
       } else {
         throw new Error(result.error || 'Failed to mark as sold');
@@ -157,7 +171,7 @@ export default function ManageInventoryPage() {
   };
 
   const handleRefresh = () => {
-    loadFrames(searchQuery, pagination.page);
+    loadFrames(searchQuery, pagination.page, statusFilter);
   };
 
   return (
@@ -203,6 +217,33 @@ export default function ManageInventoryPage() {
                 'Search'
               )}
             </Button>
+          </div>
+
+          {/* Status Filter */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600 mr-2">Status:</span>
+            {(['All', 'Active', 'Sold Out', 'Discontinued'] as StatusFilter[]).map((status) => (
+              <Button
+                key={status}
+                type="button"
+                variant={statusFilter === status ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => handleStatusFilter(status)}
+                className={
+                  statusFilter === status
+                    ? status === 'Active'
+                      ? 'bg-green-600 hover:bg-green-700 text-white border-2 border-green-700'
+                      : status === 'Sold Out'
+                      ? 'bg-red-600 hover:bg-red-700 text-white border-2 border-red-700'
+                      : status === 'Discontinued'
+                      ? 'bg-gray-600 hover:bg-gray-700 text-white border-2 border-gray-700'
+                      : 'bg-sky-deeper hover:bg-sky-deeper/90 text-black border-2 border-black'
+                    : 'border-2 border-gray-300 hover:border-black'
+                }
+              >
+                {status}
+              </Button>
+            ))}
           </div>
 
           <div className="flex items-center justify-between text-sm">

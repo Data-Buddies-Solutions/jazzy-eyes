@@ -89,12 +89,16 @@ export async function POST(request: NextRequest) {
       });
 
       // Create InventoryTransaction (ORDER type)
+      // Use invoice date for transaction date if provided (for backlog entries)
+      const invoiceDate = data.invoiceDate ? new Date(data.invoiceDate) : null;
+      const transactionDate = invoiceDate || new Date();
+
       await tx.inventoryTransaction.create({
         data: {
           productId: compositeId,
           transactionType: 'ORDER',
-          transactionDate: new Date(),
-          invoiceDate: data.invoiceDate ? new Date(data.invoiceDate) : null,
+          transactionDate,
+          invoiceDate,
           quantity: 1,
           unitCost: data.costPrice,
           unitPrice: data.retailPrice,

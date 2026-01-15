@@ -41,9 +41,20 @@ export async function GET(request: NextRequest) {
 
     // Add status filter to where clause if specified
     if (statusFilter && statusFilter !== 'All') {
-      where.status = {
-        name: statusFilter,
-      };
+      if (statusFilter === 'Sold Out') {
+        // Sold Out is determined by quantity being 0
+        where.currentQty = 0;
+      } else if (statusFilter === 'Active') {
+        // Active means has stock and not discontinued
+        where.currentQty = { gt: 0 };
+        where.status = {
+          name: { not: 'Discontinued' },
+        };
+      } else if (statusFilter === 'Discontinued') {
+        where.status = {
+          name: 'Discontinued',
+        };
+      }
     }
 
     // Get total count for pagination
