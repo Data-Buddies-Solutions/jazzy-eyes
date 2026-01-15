@@ -66,6 +66,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get Active status for new frames
+    const activeStatus = await prisma.frameStatus.findUnique({
+      where: { name: 'Active' },
+    });
+
     // Create Product + InventoryTransaction in a transaction
     const result = await prisma.$transaction(async (tx) => {
       // Create Product record
@@ -73,6 +78,7 @@ export async function POST(request: NextRequest) {
         data: {
           compositeId,
           brandId: data.brandId,
+          statusId: activeStatus?.id,
           styleNumber: data.styleNumber,
           colorCode: data.colorCode,
           eyeSize: data.eyeSize,
