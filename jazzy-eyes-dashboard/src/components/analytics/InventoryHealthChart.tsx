@@ -103,7 +103,10 @@ export function InventoryHealthChart() {
                 cy="50%"
                 outerRadius={80}
                 dataKey="count"
-                label={(entry) => `${entry.statusName} (${entry.count})`}
+                label={(entry) => {
+                  const e = entry as unknown as { statusName: string; count: number };
+                  return `${e.statusName} (${e.count})`;
+                }}
               >
                 {data.statusDistribution.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={STATUS_COLORS[entry.colorScheme] || '#87CEEB'} />

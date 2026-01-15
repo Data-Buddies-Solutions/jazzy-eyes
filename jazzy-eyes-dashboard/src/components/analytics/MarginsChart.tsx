@@ -106,7 +106,7 @@ export function MarginsChart({ dateRange }: MarginsChartProps) {
             <XAxis type="number" />
             <YAxis dataKey="brandName" type="category" width={85} />
             <Tooltip
-              formatter={(value: number) => `$${value.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+              formatter={(value) => `$${Number(value).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
             />
             <Legend />
             <Bar dataKey="totalRevenue" fill="#87CEEB" name="Revenue" />

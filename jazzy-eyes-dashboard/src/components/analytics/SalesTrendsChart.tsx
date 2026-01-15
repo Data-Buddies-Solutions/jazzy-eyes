@@ -119,7 +119,7 @@ export function SalesTrendsChart({ dateRange }: SalesTrendsChartProps) {
             <YAxis />
             <Tooltip
               labelFormatter={(date) => new Date(date).toLocaleDateString()}
-              formatter={(value: number) => [`$${value.toFixed(2)}`, 'Revenue']}
+              formatter={(value) => [`$${Number(value).toFixed(2)}`, 'Revenue']}
             />
             <Line
               type="monotone"
@@ -147,7 +147,7 @@ export function SalesTrendsChart({ dateRange }: SalesTrendsChartProps) {
               <YAxis />
               <Tooltip
                 labelFormatter={(date) => new Date(date).toLocaleDateString()}
-                formatter={(value: number) => `$${value.toFixed(2)}`}
+                formatter={(value) => `$${Number(value).toFixed(2)}`}
               />
               <Legend />
               {data.brandTrends.slice(0, 7).map((brand, index) => (
