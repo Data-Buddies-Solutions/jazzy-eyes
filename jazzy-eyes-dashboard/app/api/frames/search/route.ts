@@ -91,7 +91,7 @@ export async function GET(request: NextRequest) {
           orderBy: { transactionDate: 'desc' },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { compositeId: 'asc' },
       skip,
       take: limit,
     });

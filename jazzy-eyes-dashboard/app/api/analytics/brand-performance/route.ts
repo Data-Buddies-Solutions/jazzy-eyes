@@ -34,6 +34,14 @@ export async function GET(request: NextRequest) {
             },
           },
         },
+        rxSales: {
+          where: {
+            saleDate: {
+              gte: startDate,
+              lte: endDate,
+            },
+          },
+        },
       },
       orderBy: {
         brandName: 'asc',
@@ -50,24 +58,37 @@ export async function GET(request: NextRequest) {
         (p) => p.status?.name !== 'Sold'
       ).length;
 
-      // Get sale transactions in date range
+      // Get sale transactions in date range (inventory sales)
       const saleTransactions = allProducts.flatMap((p) =>
         p.transactions.filter((t) => t.transactionType === 'SALE')
       );
 
-      const totalSold = saleTransactions.length;
+      // Get RX sales in date range
+      const rxSales = brand.rxSales;
 
-      // Calculate revenue
-      const revenue = saleTransactions.reduce(
+      const inventorySold = saleTransactions.length;
+      const rxSold = rxSales.length;
+      const totalSold = inventorySold + rxSold;
+
+      // Calculate revenue (inventory + RX)
+      const inventoryRevenue = saleTransactions.reduce(
         (sum, t) => sum + Number(t.unitPrice),
         0
       );
+      const rxRevenue = rxSales.reduce(
+        (sum, rx) => sum + Number(rx.salePrice),
+        0
+      );
+      const revenue = inventoryRevenue + rxRevenue;
 
-      // Calculate average margin
+      // Calculate average margin (including RX sales with cost data)
       let avgMargin = 0;
       if (totalSold > 0) {
-        const marginsSum = saleTransactions.reduce((sum, saleTransaction) => {
-          // Find corresponding ORDER transaction for cost
+        let marginsSum = 0;
+        let marginsCount = 0;
+
+        // Inventory sale margins
+        saleTransactions.forEach((saleTransaction) => {
           const product = allProducts.find(
             (p) => p.compositeId === saleTransaction.productId
           );
@@ -79,17 +100,28 @@ export async function GET(request: NextRequest) {
             const salePrice = Number(saleTransaction.unitPrice);
             const costPrice = Number(orderTransaction.unitCost);
             const margin = ((salePrice - costPrice) / salePrice) * 100;
-            return sum + margin;
+            marginsSum += margin;
+            marginsCount += 1;
           }
-          return sum;
-        }, 0);
+        });
 
-        avgMargin = marginsSum / totalSold;
+        // RX sale margins (if cost data exists)
+        rxSales.forEach((rx) => {
+          const salePrice = Number(rx.salePrice);
+          const costPrice = Number(rx.costPrice);
+          if (costPrice > 0 && salePrice > 0) {
+            const margin = ((salePrice - costPrice) / salePrice) * 100;
+            marginsSum += margin;
+            marginsCount += 1;
+          }
+        });
+
+        avgMargin = marginsCount > 0 ? marginsSum / marginsCount : 0;
       }
 
-      // Calculate sell-through rate
-      const totalUnits = totalSold + totalInventory;
-      const sellThroughRate = totalUnits > 0 ? (totalSold / totalUnits) * 100 : 0;
+      // Calculate sell-through rate (inventory only - RX doesn't affect inventory)
+      const totalUnits = inventorySold + totalInventory;
+      const sellThroughRate = totalUnits > 0 ? (inventorySold / totalUnits) * 100 : 0;
 
       // Reorder recommendation: inventory < 20% of allocation
       const reorderRecommended =
@@ -102,6 +134,8 @@ export async function GET(request: NextRequest) {
         allocationQuantity: brand.allocationQuantity,
         totalInventory,
         totalSold,
+        inventorySold,
+        rxSold,
         revenue,
         avgMargin,
         sellThroughRate,

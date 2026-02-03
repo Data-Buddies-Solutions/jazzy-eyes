@@ -13,10 +13,12 @@ export interface BrandPerformanceData {
   companyName: string;
   allocationQuantity: number;
   totalInventory: number; // Active + non-sold
-  totalSold: number; // Sold in period
-  revenue: number; // Sales revenue
+  totalSold: number; // Sold in period (inventory + RX)
+  inventorySold?: number; // Inventory sales only
+  rxSold?: number; // RX sales only
+  revenue: number; // Sales revenue (inventory + RX)
   avgMargin: number; // %
-  sellThroughRate: number; // %
+  sellThroughRate: number; // % (inventory only)
   reorderRecommended: boolean; // inventory < 20% of allocation
 }
 
@@ -29,9 +31,11 @@ export interface BrandPerformanceResponse {
 export interface SellThroughData {
   brandName: string;
   currentInventory: number;
-  soldInPeriod: number;
-  sellThroughRate: number; // %
-  velocity: number; // units/day
+  soldInPeriod: number; // Total sold (inventory + RX)
+  inventorySold?: number; // Inventory sales only
+  rxSold?: number; // RX sales only
+  sellThroughRate: number; // % (inventory only)
+  velocity: number; // units/day (all sales)
   status: 'excellent' | 'good' | 'slow' | 'stale';
 }
 
@@ -40,6 +44,8 @@ export interface SellThroughResponse {
   data: SellThroughData[];
   summary: {
     overallSellThrough: number;
+    totalSold?: number;
+    totalRxSold?: number;
     fastestMoving: string;
     slowestMoving: string;
   };
@@ -88,7 +94,7 @@ export interface BrandMargin {
 }
 
 export interface ProductTypeMargin {
-  productType: 'Optical' | 'Sun';
+  productType: string; // 'Optical', 'Sun', 'Sunglasses', etc.
   revenue: number;
   profit: number;
   marginPercent: number;

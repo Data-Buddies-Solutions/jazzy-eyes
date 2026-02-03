@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     const startDate = new Date(startDateStr);
     const endDate = new Date(endDateStr);
 
-    // Get all SALE transactions in the date range with their products
+    // Get all SALE transactions in the date range with their products (inventory sales)
     const saleTransactions = await prisma.inventoryTransaction.findMany({
       where: {
         transactionType: 'SALE',
@@ -46,6 +46,23 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    // Get all RX sales in the date range
+    const rxSales = await prisma.rxSale.findMany({
+      where: {
+        saleDate: {
+          gte: startDate,
+          lte: endDate,
+        },
+      },
+      include: {
+        brand: {
+          select: {
+            brandName: true,
+          },
+        },
+      },
+    });
+
     // Calculate margins by brand
     const brandMarginMap = new Map<
       string,
@@ -58,13 +75,14 @@ export async function GET(request: NextRequest) {
 
     // Calculate margins by product type
     const productTypeMarginMap = new Map<
-      'Optical' | 'Sun',
+      string,
       {
         revenue: number;
         cost: number;
       }
     >();
 
+    // Process inventory sale transactions
     saleTransactions.forEach((saleTransaction) => {
       const brandName = saleTransaction.product.brand.brandName;
       const orderTransaction = saleTransaction.product.transactions[0];
@@ -89,7 +107,44 @@ export async function GET(request: NextRequest) {
       brandData.unitsSold += 1;
 
       // By product type
-      const productType = saleTransaction.product.productType as 'Optical' | 'Sun';
+      const productType = saleTransaction.product.productType;
+      if (!productTypeMarginMap.has(productType)) {
+        productTypeMarginMap.set(productType, {
+          revenue: 0,
+          cost: 0,
+        });
+      }
+
+      const productTypeData = productTypeMarginMap.get(productType)!;
+      productTypeData.revenue += revenue;
+      productTypeData.cost += cost;
+    });
+
+    // Process RX sales (include if they have cost data)
+    rxSales.forEach((rx) => {
+      const brandName = rx.brand.brandName;
+      const revenue = Number(rx.salePrice);
+      const cost = Number(rx.costPrice);
+
+      // Only include in margin calculations if we have cost data
+      if (cost <= 0) return;
+
+      // By brand
+      if (!brandMarginMap.has(brandName)) {
+        brandMarginMap.set(brandName, {
+          totalRevenue: 0,
+          totalCost: 0,
+          unitsSold: 0,
+        });
+      }
+
+      const brandData = brandMarginMap.get(brandName)!;
+      brandData.totalRevenue += revenue;
+      brandData.totalCost += cost;
+      brandData.unitsSold += 1;
+
+      // By product type (RX sales have productType field)
+      const productType = rx.productType;
       if (!productTypeMarginMap.has(productType)) {
         productTypeMarginMap.set(productType, {
           revenue: 0,

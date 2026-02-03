@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     const startDate = new Date(startDateStr);
     const endDate = new Date(endDateStr);
 
-    // Get all SALE transactions in date range
+    // Get all SALE transactions in date range (inventory sales)
     const saleTransactions = await prisma.inventoryTransaction.findMany({
       where: {
         transactionType: 'SALE',
@@ -43,6 +43,26 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    // Get all RX sales in date range
+    const rxSales = await prisma.rxSale.findMany({
+      where: {
+        saleDate: {
+          gte: startDate,
+          lte: endDate,
+        },
+      },
+      include: {
+        brand: {
+          select: {
+            brandName: true,
+          },
+        },
+      },
+      orderBy: {
+        saleDate: 'asc',
+      },
+    });
+
     // Group by date
     const dailySalesMap = new Map<
       string,
@@ -50,6 +70,8 @@ export async function GET(request: NextRequest) {
         unitsSold: number;
         revenue: number;
         totalPrice: number;
+        inventoryUnits: number;
+        rxUnits: number;
       }
     >();
 
@@ -65,6 +87,7 @@ export async function GET(request: NextRequest) {
       >
     >();
 
+    // Process inventory transactions
     saleTransactions.forEach((transaction) => {
       const dateStr = transaction.transactionDate.toISOString().split('T')[0];
       const brandName = transaction.product.brand.brandName;
@@ -76,11 +99,55 @@ export async function GET(request: NextRequest) {
           unitsSold: 0,
           revenue: 0,
           totalPrice: 0,
+          inventoryUnits: 0,
+          rxUnits: 0,
         });
       }
 
       const dailyData = dailySalesMap.get(dateStr)!;
       dailyData.unitsSold += 1;
+      dailyData.inventoryUnits += 1;
+      dailyData.revenue += revenue;
+      dailyData.totalPrice += revenue;
+
+      // Brand trends
+      if (!brandTrendsMap.has(brandName)) {
+        brandTrendsMap.set(brandName, new Map());
+      }
+
+      const brandDateMap = brandTrendsMap.get(brandName)!;
+      if (!brandDateMap.has(dateStr)) {
+        brandDateMap.set(dateStr, {
+          units: 0,
+          revenue: 0,
+        });
+      }
+
+      const brandDateData = brandDateMap.get(dateStr)!;
+      brandDateData.units += 1;
+      brandDateData.revenue += revenue;
+    });
+
+    // Process RX sales
+    rxSales.forEach((rx) => {
+      const dateStr = rx.saleDate.toISOString().split('T')[0];
+      const brandName = rx.brand.brandName;
+      const revenue = Number(rx.salePrice);
+
+      // Daily sales
+      if (!dailySalesMap.has(dateStr)) {
+        dailySalesMap.set(dateStr, {
+          unitsSold: 0,
+          revenue: 0,
+          totalPrice: 0,
+          inventoryUnits: 0,
+          rxUnits: 0,
+        });
+      }
+
+      const dailyData = dailySalesMap.get(dateStr)!;
+      dailyData.unitsSold += 1;
+      dailyData.rxUnits += 1;
       dailyData.revenue += revenue;
       dailyData.totalPrice += revenue;
 
