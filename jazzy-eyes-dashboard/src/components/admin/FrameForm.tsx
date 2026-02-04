@@ -19,6 +19,56 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
 
+// Pricing rules by brand name
+const PRICING_RULES: Record<string, { type: 'multiplier' | 'flat'; value: number; round?: boolean }> = {
+  // 2.9x rounded to nearest 5
+  'YSL': { type: 'multiplier', value: 2.9, round: true },
+  'Chloe': { type: 'multiplier', value: 2.9, round: true },
+  'Gucci': { type: 'multiplier', value: 2.9, round: true },
+  'Lool': { type: 'multiplier', value: 2.9, round: true },
+  'Etnia': { type: 'multiplier', value: 2.9, round: true },
+  'Chroma': { type: 'multiplier', value: 2.9, round: true },
+  'Pellicer': { type: 'multiplier', value: 2.9, round: true },
+  'Tom Ford': { type: 'multiplier', value: 2.9, round: true },
+  'Fendi': { type: 'multiplier', value: 2.9, round: true },
+  'Fred': { type: 'multiplier', value: 2.9, round: true },
+  'Morel ': { type: 'multiplier', value: 2.9, round: true },
+  'Rayban': { type: 'multiplier', value: 2.9, round: true },
+  'Oakley': { type: 'multiplier', value: 2.9, round: true },
+  'Salt': { type: 'multiplier', value: 2.9, round: true },
+  'Silhouette': { type: 'multiplier', value: 2.9, round: true },
+  'Chopard': { type: 'multiplier', value: 2.9, round: true },
+  'LA Eyeworks': { type: 'multiplier', value: 2.9, round: true },
+  'Faniel': { type: 'multiplier', value: 2.9, round: true },
+  // 2x flat (no rounding)
+  'Maui Jim': { type: 'multiplier', value: 2, round: false },
+  // $250 flat price
+  'Café': { type: 'flat', value: 250 },
+  'NRG': { type: 'flat', value: 250 },
+  'CLD': { type: 'flat', value: 250 },
+  'Pepe Jeans': { type: 'flat', value: 250 },
+  'Vera Bradley ': { type: 'flat', value: 250 },
+  'Konishi': { type: 'flat', value: 250 },
+};
+
+// Round to nearest 5
+function roundToNearest5(value: number): number {
+  return Math.round(value / 5) * 5;
+}
+
+// Calculate retail price based on brand and cost
+function calculateRetailPrice(brandName: string, costPrice: number): number | null {
+  const rule = PRICING_RULES[brandName];
+  if (!rule || costPrice <= 0) return null;
+
+  if (rule.type === 'flat') {
+    return rule.value;
+  }
+
+  const calculated = costPrice * rule.value;
+  return rule.round ? roundToNearest5(calculated) : calculated;
+}
+
 interface FrameFormProps {
   onSubmit: (data: FrameFormData) => void;
   defaultValues?: Partial<FrameFormData>;
@@ -62,6 +112,21 @@ export function FrameForm({
   const gender = watch('gender');
   const frameType = watch('frameType');
   const productType = watch('productType');
+  const watchedBrandId = watch('brandId');
+  const watchedCostPrice = watch('costPrice');
+
+  // Auto-calculate retail price when brand or cost changes
+  useEffect(() => {
+    if (!watchedBrandId || !watchedCostPrice || watchedCostPrice <= 0) return;
+
+    const selectedBrand = brands.find((b) => b.id === watchedBrandId);
+    if (!selectedBrand) return;
+
+    const calculatedRetail = calculateRetailPrice(selectedBrand.brandName, watchedCostPrice);
+    if (calculatedRetail !== null) {
+      setValue('retailPrice', calculatedRetail);
+    }
+  }, [watchedBrandId, watchedCostPrice, brands, setValue]);
 
   // Fetch brands from API
   useEffect(() => {

@@ -40,6 +40,14 @@ export async function GET(request: NextRequest) {
             },
           },
         },
+        rxSales: {
+          where: {
+            saleDate: {
+              gte: startDate,
+              lte: endDate,
+            },
+          },
+        },
       },
       orderBy: {
         brandName: 'asc',
@@ -54,18 +62,24 @@ export async function GET(request: NextRequest) {
           (p) => p.status?.name !== 'Sold'
         ).length;
 
-        // Sold in period
-        const soldInPeriod = brand.products.filter((p) =>
+        // Inventory sold in period
+        const inventorySoldInPeriod = brand.products.filter((p) =>
           p.transactions.some((t) => t.transactionType === 'SALE')
         ).length;
 
-        // Calculate sell-through rate
-        const totalUnits = soldInPeriod + currentInventory;
-        const sellThroughRate =
-          totalUnits > 0 ? (soldInPeriod / totalUnits) * 100 : 0;
+        // RX sold in period (doesn't affect inventory)
+        const rxSoldInPeriod = brand.rxSales.length;
 
-        // Calculate velocity (units per day)
-        const velocity = daysInPeriod > 0 ? soldInPeriod / daysInPeriod : 0;
+        // Total sold (inventory + RX)
+        const totalSoldInPeriod = inventorySoldInPeriod + rxSoldInPeriod;
+
+        // Calculate sell-through rate (inventory only - RX doesn't come from inventory)
+        const totalUnits = inventorySoldInPeriod + currentInventory;
+        const sellThroughRate =
+          totalUnits > 0 ? (inventorySoldInPeriod / totalUnits) * 100 : 0;
+
+        // Calculate velocity (all units per day including RX)
+        const velocity = daysInPeriod > 0 ? totalSoldInPeriod / daysInPeriod : 0;
 
         // Determine status based on sell-through rate
         let status: 'excellent' | 'good' | 'slow' | 'stale';
@@ -82,7 +96,9 @@ export async function GET(request: NextRequest) {
         return {
           brandName: brand.brandName,
           currentInventory,
-          soldInPeriod,
+          soldInPeriod: totalSoldInPeriod,
+          inventorySold: inventorySoldInPeriod,
+          rxSold: rxSoldInPeriod,
           sellThroughRate,
           velocity,
           status,
@@ -95,13 +111,15 @@ export async function GET(request: NextRequest) {
 
     // Calculate summary
     const totalSold = sellThroughData.reduce((sum, b) => sum + b.soldInPeriod, 0);
+    const totalInventorySold = sellThroughData.reduce((sum, b) => sum + b.inventorySold, 0);
+    const totalRxSold = sellThroughData.reduce((sum, b) => sum + b.rxSold, 0);
     const totalInventory = sellThroughData.reduce(
       (sum, b) => sum + b.currentInventory,
       0
     );
     const overallSellThrough =
-      totalSold + totalInventory > 0
-        ? (totalSold / (totalSold + totalInventory)) * 100
+      totalInventorySold + totalInventory > 0
+        ? (totalInventorySold / (totalInventorySold + totalInventory)) * 100
         : 0;
 
     const fastestMoving =
@@ -116,6 +134,8 @@ export async function GET(request: NextRequest) {
       data: sellThroughData,
       summary: {
         overallSellThrough,
+        totalSold,
+        totalRxSold,
         fastestMoving,
         slowestMoving,
       },
