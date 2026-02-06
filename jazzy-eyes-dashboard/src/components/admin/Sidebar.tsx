@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { PlusCircle, Search, BarChart3, X, Store, Tag, LogOut, AlertTriangle, Glasses } from 'lucide-react';
+import { PlusCircle, Search, BarChart3, X, Store, Tag, LogOut, AlertTriangle, Glasses, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/AuthContext';
 
@@ -50,6 +50,11 @@ const navigation: NavItem[] = [
     name: 'View Analytics',
     href: '/admin/analytics',
     icon: BarChart3,
+  },
+  {
+    name: 'EOM Report',
+    href: '/admin/reports/eom',
+    icon: FileText,
   },
 ];
 

@@ -353,3 +353,4 @@ After implementation, test these scenarios:
 - **User tracking:** Record who performed each transaction
 - **Undo sale:** Ability to reverse a sale (more complex than write-off revert)
 - **Transfer between locations:** If multiple store locations in future
+

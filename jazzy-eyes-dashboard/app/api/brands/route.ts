@@ -43,12 +43,14 @@ export async function GET() {
 
     const companies = Array.from(companyMap.values());
 
-    // Also return flat brands list for backward compatibility
-    const simpleBrands = brands.map((b) => ({
-      id: b.id,
-      brandName: b.brandName,
-      companyName: b.companyName,
-    }));
+    // Also return flat brands list for backward compatibility (sorted alphabetically)
+    const simpleBrands = brands
+      .map((b) => ({
+        id: b.id,
+        brandName: b.brandName,
+        companyName: b.companyName,
+      }))
+      .sort((a, b) => a.brandName.localeCompare(b.brandName));
 
     return NextResponse.json({ success: true, companies, brands: simpleBrands });
   } catch (error) {
