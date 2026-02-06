@@ -7,6 +7,13 @@ export async function GET(request: NextRequest) {
     const year = parseInt(searchParams.get('year') || new Date().getFullYear().toString(), 10);
     const month = parseInt(searchParams.get('month') || (new Date().getMonth() + 1).toString(), 10);
 
+    if (isNaN(year) || isNaN(month) || month < 1 || month > 12 || year < 2000 || year > 2100) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid year or month parameter' },
+        { status: 400 }
+      );
+    }
+
     // Calculate date range for the month
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0, 23, 59, 59, 999); // Last day of month

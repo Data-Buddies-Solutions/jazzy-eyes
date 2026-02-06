@@ -192,6 +192,37 @@ export async function PUT(
 }
 
 /**
+ * Preview FIFO cost without modifying inventory batches.
+ * Used to validate below-cost sales before committing.
+ */
+async function previewFIFOCost(
+  productId: string,
+  quantityToConsume: number
+): Promise<number> {
+  const batches = await prisma.inventoryTransaction.findMany({
+    where: {
+      productId,
+      transactionType: { in: ['ORDER', 'RESTOCK'] },
+      remainingQty: { gt: 0 },
+    },
+    orderBy: { transactionDate: 'asc' },
+  });
+
+  let remainingToConsume = quantityToConsume;
+  let totalCost = 0;
+
+  for (const batch of batches) {
+    if (remainingToConsume <= 0) break;
+    const availableInBatch = batch.remainingQty || 0;
+    const consumeFromBatch = Math.min(availableInBatch, remainingToConsume);
+    totalCost += consumeFromBatch * Number(batch.unitCost);
+    remainingToConsume -= consumeFromBatch;
+  }
+
+  return quantityToConsume > 0 ? totalCost / quantityToConsume : 0;
+}
+
+/**
  * Helper function to consume inventory using FIFO logic
  * Returns the weighted average cost for the consumed quantity
  */
@@ -326,19 +357,22 @@ export async function PATCH(
         );
       }
 
-      // Calculate FIFO cost
-      const { avgCost } = await consumeFIFOInventory(compositeId, quantity);
-
       const retailPrice = await getRetailPrice(compositeId);
       const finalSalePrice = salePrice || retailPrice;
 
+      // Calculate FIFO cost preview (without consuming) to validate before mutating
+      const previewCost = await previewFIFOCost(compositeId, quantity);
+
       // Prevent selling below cost
-      if (avgCost > 0 && finalSalePrice < avgCost) {
+      if (previewCost > 0 && finalSalePrice < previewCost) {
         return NextResponse.json(
-          { success: false, error: `Sale price ($${finalSalePrice.toFixed(2)}) cannot be below wholesale cost ($${avgCost.toFixed(2)})` },
+          { success: false, error: `Sale price ($${finalSalePrice.toFixed(2)}) cannot be below wholesale cost ($${previewCost.toFixed(2)})` },
           { status: 400 }
         );
       }
+
+      // Now actually consume FIFO inventory
+      const { avgCost } = await consumeFIFOInventory(compositeId, quantity);
       const finalSaleDate = saleDate ? new Date(saleDate) : new Date();
 
       const newQty = existingProduct.currentQty - quantity;

@@ -311,7 +311,7 @@ export default function EOMReportPage() {
         )}
 
         {/* Report Content */}
-        {!loading && report && (
+        {!loading && report && report.sales.length > 0 && (
           <div ref={printRef} className="print-area space-y-6">
             {/* Report Header */}
             <div className="report-header text-center border-b-2 border-black pb-4">
