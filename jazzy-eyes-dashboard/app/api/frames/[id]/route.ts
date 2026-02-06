@@ -331,6 +331,14 @@ export async function PATCH(
 
       const retailPrice = await getRetailPrice(compositeId);
       const finalSalePrice = salePrice || retailPrice;
+
+      // Prevent selling below cost
+      if (avgCost > 0 && finalSalePrice < avgCost) {
+        return NextResponse.json(
+          { success: false, error: `Sale price ($${finalSalePrice.toFixed(2)}) cannot be below wholesale cost ($${avgCost.toFixed(2)})` },
+          { status: 400 }
+        );
+      }
       const finalSaleDate = saleDate ? new Date(saleDate) : new Date();
 
       const newQty = existingProduct.currentQty - quantity;

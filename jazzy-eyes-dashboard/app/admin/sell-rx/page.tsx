@@ -99,7 +99,10 @@ export default function SellPrescriptionPage() {
         const response = await fetch('/api/brands');
         const data = await response.json();
         if (data.success && data.brands) {
-          setBrands(data.brands);
+          const sortedBrands = [...data.brands].sort((a: Brand, b: Brand) =>
+            a.brandName.localeCompare(b.brandName)
+          );
+          setBrands(sortedBrands);
         }
       } catch (error) {
         console.error('Error fetching brands:', error);

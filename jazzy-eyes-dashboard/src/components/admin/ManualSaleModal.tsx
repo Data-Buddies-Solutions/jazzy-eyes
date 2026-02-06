@@ -99,6 +99,8 @@ export function ManualSaleModal({
   };
 
   const totalSaleAmount = parseFloat(salePrice) * quantity;
+  const currentSalePrice = parseFloat(salePrice) || 0;
+  const isBelowCost = frame.costPrice > 0 && currentSalePrice < frame.costPrice;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -134,6 +136,12 @@ export function ManualSaleModal({
                 <div className="flex justify-between border-t pt-2">
                   <span className="text-sm text-gray-600">Available Stock:</span>
                   <span className="font-semibold">{frame.currentQty} unit(s)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600">Wholesale Cost:</span>
+                  <span className="font-semibold">
+                    ${frame.costPrice.toFixed(2)}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-600">Retail Price:</span>
@@ -205,9 +213,14 @@ export function ManualSaleModal({
                   className="border-2 border-black pl-7"
                 />
               </div>
+              {isBelowCost && (
+                <p className="text-sm text-red-600 font-medium">
+                  Sale price cannot be below wholesale cost (${frame.costPrice.toFixed(2)})
+                </p>
+              )}
               <p className="text-xs text-gray-500">
                 Leave as retail price or enter a different amount if the frame
-                was sold at a discount or premium.
+                was sold at a discount.
               </p>
             </div>
 
@@ -252,7 +265,7 @@ export function ManualSaleModal({
             </Button>
             <Button
               type="submit"
-              disabled={isLoading || quantity < 1 || quantity > maxQty}
+              disabled={isLoading || quantity < 1 || quantity > maxQty || isBelowCost}
               className="bg-sky-deeper hover:bg-sky-deeper/90 text-black font-semibold border-2 border-black"
             >
               {isLoading ? (
