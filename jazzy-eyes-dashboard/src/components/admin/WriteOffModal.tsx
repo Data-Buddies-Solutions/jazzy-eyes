@@ -108,7 +108,7 @@ export function WriteOffModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] border-2 border-black">
+      <DialogContent className="sm:max-w-[500px] max-h-[80vh] overflow-y-auto border-2 border-black">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle className="text-2xl flex items-center gap-2">
