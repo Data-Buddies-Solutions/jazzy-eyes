@@ -56,6 +56,11 @@ const navigation: NavItem[] = [
     href: '/admin/reports/eom',
     icon: FileText,
   },
+  {
+    name: 'Inventory Report',
+    href: '/admin/reports/inventory',
+    icon: FileText,
+  },
 ];
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
