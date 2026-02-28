@@ -22,6 +22,8 @@ An inventory management and admin portal for Jazzy Eyes optical business. Built 
 - **Analytics** - View sales trends, brand performance, margins, and inventory health
 - **Brand Management** - Manage brands and company allocations
 - **Write-offs** - Track and manage inventory write-offs with multiple reasons (damaged, lost, defective, return)
+- **EOM Report** - End-of-month sales report with brand summaries, detailed transactions, and print-to-PDF
+- **Inventory Report** - Per-brand inventory report with status summaries and print-to-PDF
 
 ### Inventory Management
 
@@ -99,12 +101,14 @@ jazzy-eyes-dashboard/
 │   │   ├── analytics/      # Analytics dashboard
 │   │   ├── brands/         # Brand management
 │   │   ├── manage/         # Inventory management
+│   │   ├── reports/        # Reports (EOM, Inventory)
 │   │   ├── sell-rx/        # Prescription sales
 │   │   └── write-offs/     # Write-off tracking
 │   ├── api/                # API routes
 │   │   ├── analytics/      # Analytics endpoints
 │   │   ├── brands/         # Brand CRUD
 │   │   ├── frames/         # Frame CRUD and search
+│   │   ├── reports/        # Report endpoints (EOM, Inventory)
 │   │   ├── rx-sales/       # RX sales endpoints
 │   │   ├── statuses/       # Status management
 │   │   └── write-offs/     # Write-off endpoints
@@ -165,6 +169,10 @@ The dashboard uses a consistent design system:
 ### RX Sales
 - `GET /api/rx-sales` - List all RX sales
 - `POST /api/rx-sales` - Record a new RX sale
+
+### Reports
+- `GET /api/reports/eom` - End-of-month sales report (params: `year`, `month`)
+- `GET /api/reports/inventory` - Inventory report by brand (params: `brandId`)
 
 ### Analytics
 - `GET /api/analytics/sales-trends` - Sales trends data
