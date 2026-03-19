@@ -118,7 +118,7 @@ export default function ManageInventoryPage() {
 
     setIsSaving(true);
     try {
-      const response = await fetch(`/api/frames/${editingFrame.frameId}`, {
+      const response = await fetch(`/api/frames/${encodeURIComponent(editingFrame.frameId)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -144,40 +144,6 @@ export default function ManageInventoryPage() {
       toast.error('Failed to update frame. Please try again.');
     } finally {
       setIsSaving(false);
-    }
-  };
-
-  const handleMarkAsSold = async (
-    frameId: string,
-    quantity: number,
-    salePrice?: number,
-    saleDate?: string
-  ) => {
-    try {
-      const response = await fetch(`/api/frames/${frameId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'mark_as_sold',
-          quantity,
-          salePrice,
-          saleDate,
-        }),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        await loadFrames(searchQuery, pagination.page, statusFilter);
-        toast.success(result.message || `Sold ${quantity} unit(s) successfully!`);
-      } else {
-        throw new Error(result.error || 'Failed to mark as sold');
-      }
-    } catch (error) {
-      console.error('Error marking frame as sold:', error);
-      toast.error(
-        error instanceof Error ? error.message : 'Failed to mark frame as sold. Please try again.'
-      );
     }
   };
 
@@ -321,7 +287,6 @@ export default function ManageInventoryPage() {
           <FrameTable
             frames={frames}
             onEdit={handleEdit}
-            onMarkAsSold={handleMarkAsSold}
             onRefresh={handleRefresh}
           />
 
