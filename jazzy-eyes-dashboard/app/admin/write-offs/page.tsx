@@ -88,7 +88,7 @@ export default function WriteOffsPage() {
     setRevertConfirmOpen(false);
 
     try {
-      const response = await fetch(`/api/frames/${selectedWriteOff.frameId}`, {
+      const response = await fetch(`/api/frames/${encodeURIComponent(selectedWriteOff.frameId)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

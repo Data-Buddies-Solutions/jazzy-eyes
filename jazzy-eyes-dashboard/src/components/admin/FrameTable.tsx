@@ -20,14 +20,12 @@ import { TransactionHistoryModal } from './TransactionHistoryModal';
 interface FrameTableProps {
   frames: Frame[];
   onEdit: (frame: Frame) => void;
-  onMarkAsSold: (frameId: string, quantity: number, salePrice?: number, saleDate?: string) => Promise<void>;
   onRefresh: () => void;
 }
 
 export function FrameTable({
   frames,
   onEdit,
-  onMarkAsSold,
   onRefresh,
 }: FrameTableProps) {
   const [selectedFrame, setSelectedFrame] = useState<Frame | null>(null);
@@ -54,14 +52,6 @@ export function FrameTable({
   const handleHistory = (frame: Frame) => {
     setSelectedFrame(frame);
     setHistoryModalOpen(true);
-  };
-
-  const handleSaleSubmit = async (quantity: number, salePrice?: number, saleDate?: string) => {
-    if (selectedFrame) {
-      await onMarkAsSold(selectedFrame.frameId, quantity, salePrice, saleDate);
-      setSaleModalOpen(false);
-      setSelectedFrame(null);
-    }
   };
 
   if (frames.length === 0) {
@@ -192,7 +182,7 @@ export function FrameTable({
             open={saleModalOpen}
             onOpenChange={setSaleModalOpen}
             frame={selectedFrame}
-            onSubmit={handleSaleSubmit}
+            onSuccess={onRefresh}
           />
           <WriteOffModal
             open={writeOffModalOpen}

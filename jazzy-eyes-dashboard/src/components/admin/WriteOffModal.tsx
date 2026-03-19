@@ -71,7 +71,7 @@ export function WriteOffModal({
     setIsLoading(true);
 
     try {
-      const response = await fetch(`/api/frames/${frame.frameId}`, {
+      const response = await fetch(`/api/frames/${encodeURIComponent(frame.frameId)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

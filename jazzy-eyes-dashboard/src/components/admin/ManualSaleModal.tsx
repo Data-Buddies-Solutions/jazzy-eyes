@@ -21,14 +21,15 @@ interface ManualSaleModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   frame: Frame;
-  onSubmit: (quantity: number, salePrice?: number, saleDate?: string) => Promise<void>;
+  onSuccess: () => void;
 }
 
 export function ManualSaleModal({
   open,
   onOpenChange,
   frame,
-}: ManualSaleModalProps & { onSubmit: (quantity: number, salePrice?: number, saleDate?: string) => Promise<void> }) {
+  onSuccess,
+}: ManualSaleModalProps) {
   const [quantity, setQuantity] = useState<number>(1);
   const [salePrice, setSalePrice] = useState<string>(frame.retailPrice.toString());
   const [saleDate, setSaleDate] = useState<string>(
@@ -67,7 +68,7 @@ export function ManualSaleModal({
       const finalDate = dateObj.toISOString();
 
       // Call the parent's onSubmit with quantity
-      const response = await fetch(`/api/frames/${frame.frameId}`, {
+      const response = await fetch(`/api/frames/${encodeURIComponent(frame.frameId)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -85,8 +86,7 @@ export function ManualSaleModal({
         onOpenChange(false);
         // Reset form
         setQuantity(1);
-        // Trigger a page refresh or callback to reload frames
-        window.location.reload();
+        onSuccess();
       } else {
         throw new Error(result.error || 'Failed to record sale');
       }
