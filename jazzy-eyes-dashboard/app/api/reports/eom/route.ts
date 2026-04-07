@@ -68,6 +68,16 @@ export async function GET(request: NextRequest) {
       let unitCost = Number(sale.unitCost);
       if (unitCost === 0 && sale.product.transactions.length > 0) {
         unitCost = Number(sale.product.transactions[0].unitCost);
+        // Apply brand discount to fallback cost for sales on/after discount start date
+        const brand = sale.product.brand;
+        if (
+          brand.costDiscountPercent &&
+          Number(brand.costDiscountPercent) > 0 &&
+          brand.costDiscountStartDate &&
+          sale.transactionDate >= brand.costDiscountStartDate
+        ) {
+          unitCost = unitCost * (1 - Number(brand.costDiscountPercent) / 100);
+        }
       }
 
       return {

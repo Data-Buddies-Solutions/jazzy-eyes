@@ -192,6 +192,30 @@ export async function PUT(
 }
 
 /**
+ * Apply brand cost discount if applicable.
+ * Returns the discounted cost, or the original cost if no discount applies.
+ */
+async function applyBrandCostDiscount(
+  brandId: number,
+  cost: number,
+  saleDate: Date
+): Promise<number> {
+  const brand = await prisma.brand.findUnique({
+    where: { id: brandId },
+    select: { costDiscountPercent: true, costDiscountStartDate: true },
+  });
+  if (
+    brand?.costDiscountPercent &&
+    Number(brand.costDiscountPercent) > 0 &&
+    brand.costDiscountStartDate &&
+    saleDate >= brand.costDiscountStartDate
+  ) {
+    return cost * (1 - Number(brand.costDiscountPercent) / 100);
+  }
+  return cost;
+}
+
+/**
  * Preview FIFO cost without modifying inventory batches.
  * Used to validate below-cost sales before committing.
  */
@@ -360,20 +384,35 @@ export async function PATCH(
       const retailPrice = await getRetailPrice(compositeId);
       const finalSalePrice = salePrice || retailPrice;
 
+      const finalSaleDate = saleDate ? new Date(saleDate) : new Date();
+
       // Calculate FIFO cost preview (without consuming) to validate before mutating
       const previewCost = await previewFIFOCost(compositeId, quantity);
 
-      // Prevent selling below cost
-      if (previewCost > 0 && finalSalePrice < previewCost) {
+      // Apply brand cost discount if applicable
+      const discountedPreviewCost = await applyBrandCostDiscount(
+        existingProduct.brandId,
+        previewCost,
+        finalSaleDate
+      );
+
+      // Prevent selling below cost (using discounted cost)
+      if (discountedPreviewCost > 0 && finalSalePrice < discountedPreviewCost) {
         return NextResponse.json(
-          { success: false, error: `Sale price ($${finalSalePrice.toFixed(2)}) cannot be below wholesale cost ($${previewCost.toFixed(2)})` },
+          { success: false, error: `Sale price ($${finalSalePrice.toFixed(2)}) cannot be below wholesale cost ($${discountedPreviewCost.toFixed(2)})` },
           { status: 400 }
         );
       }
 
       // Now actually consume FIFO inventory
       const { avgCost } = await consumeFIFOInventory(compositeId, quantity);
-      const finalSaleDate = saleDate ? new Date(saleDate) : new Date();
+
+      // Apply brand cost discount to FIFO cost
+      const finalUnitCost = await applyBrandCostDiscount(
+        existingProduct.brandId,
+        avgCost,
+        finalSaleDate
+      );
 
       const newQty = existingProduct.currentQty - quantity;
 
@@ -394,7 +433,7 @@ export async function PATCH(
             transactionType: 'SALE',
             transactionDate: finalSaleDate,
             quantity,
-            unitCost: avgCost,
+            unitCost: finalUnitCost,
             unitPrice: finalSalePrice,
             status: 'completed',
             notes: `Sold ${quantity} unit(s) via admin`,

@@ -87,18 +87,32 @@ export async function GET(request: NextRequest) {
         let marginsSum = 0;
         let marginsCount = 0;
 
-        // Inventory sale margins
+        // Inventory sale margins (use SALE transaction's unitCost which includes FIFO + brand discount)
+        // Fallback to ORDER cost for older sales where unitCost was not recorded
         saleTransactions.forEach((saleTransaction) => {
-          const product = allProducts.find(
-            (p) => p.compositeId === saleTransaction.productId
-          );
-          const orderTransaction = product?.transactions.find(
-            (t) => t.transactionType === 'ORDER'
-          );
-
-          if (orderTransaction) {
-            const salePrice = Number(saleTransaction.unitPrice);
-            const costPrice = Number(orderTransaction.unitCost);
+          const salePrice = Number(saleTransaction.unitPrice);
+          let costPrice = Number(saleTransaction.unitCost);
+          if (costPrice === 0) {
+            const product = allProducts.find(
+              (p) => p.compositeId === saleTransaction.productId
+            );
+            const orderTransaction = product?.transactions.find(
+              (t) => t.transactionType === 'ORDER' || t.transactionType === 'RESTOCK'
+            );
+            if (orderTransaction) {
+              costPrice = Number(orderTransaction.unitCost);
+              // Apply brand discount to fallback cost for sales on/after discount start date
+              if (
+                brand.costDiscountPercent &&
+                Number(brand.costDiscountPercent) > 0 &&
+                brand.costDiscountStartDate &&
+                saleTransaction.transactionDate >= brand.costDiscountStartDate
+              ) {
+                costPrice = costPrice * (1 - Number(brand.costDiscountPercent) / 100);
+              }
+            }
+          }
+          if (salePrice > 0 && costPrice > 0) {
             const margin = ((salePrice - costPrice) / salePrice) * 100;
             marginsSum += margin;
             marginsCount += 1;

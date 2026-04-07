@@ -100,6 +100,8 @@ export interface SearchFilters {
 export interface BrandWithDetails extends Brand {
   allocationQuantity: number;
   companyId: number;
+  costDiscountPercent: number;
+  costDiscountStartDate: string | null;
   productCount: number;
 }
 
