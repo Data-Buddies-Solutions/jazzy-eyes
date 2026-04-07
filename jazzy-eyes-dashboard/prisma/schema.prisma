@@ -12,11 +12,13 @@ model Brand {
   companyName        String    @map("company_name") @db.VarChar(255)
   companyId          Int       @map("company_id")
   brandName          String    @unique @map("brand_name") @db.VarChar(255)
-  allocationQuantity Int       @map("allocation_quantity")
-  createdAt          DateTime  @default(now()) @map("created_at")
-  updatedAt          DateTime  @updatedAt @map("updated_at")
-  products           Product[]
-  rxSales            RxSale[]
+  allocationQuantity    Int       @map("allocation_quantity")
+  costDiscountPercent   Decimal?  @default(0) @map("cost_discount_percent") @db.Decimal(5, 2)
+  costDiscountStartDate DateTime? @map("cost_discount_start_date") @db.Date
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+  products              Product[]
+  rxSales               RxSale[]
 
   @@index([companyId])
   @@index([companyName])

@@ -33,12 +33,15 @@ export async function GET(request: NextRequest) {
             brand: {
               select: {
                 brandName: true,
+                costDiscountPercent: true,
+                costDiscountStartDate: true,
               },
             },
             transactions: {
               where: {
-                transactionType: 'ORDER',
+                transactionType: { in: ['ORDER', 'RESTOCK'] },
               },
+              orderBy: { transactionDate: 'desc' },
               take: 1,
             },
           },
@@ -85,12 +88,23 @@ export async function GET(request: NextRequest) {
     // Process inventory sale transactions
     saleTransactions.forEach((saleTransaction) => {
       const brandName = saleTransaction.product.brand.brandName;
-      const orderTransaction = saleTransaction.product.transactions[0];
-
-      if (!orderTransaction) return;
+      const brand = saleTransaction.product.brand;
 
       const revenue = Number(saleTransaction.unitPrice);
-      const cost = Number(orderTransaction.unitCost);
+      // Use SALE transaction's unitCost (includes FIFO + brand discount), fallback to ORDER cost for older records
+      let cost = Number(saleTransaction.unitCost);
+      if (cost === 0 && saleTransaction.product.transactions.length > 0) {
+        cost = Number(saleTransaction.product.transactions[0].unitCost);
+        // Apply brand discount to fallback cost for sales on/after discount start date
+        if (
+          brand.costDiscountPercent &&
+          Number(brand.costDiscountPercent) > 0 &&
+          brand.costDiscountStartDate &&
+          saleTransaction.transactionDate >= brand.costDiscountStartDate
+        ) {
+          cost = cost * (1 - Number(brand.costDiscountPercent) / 100);
+        }
+      }
 
       // By brand
       if (!brandMarginMap.has(brandName)) {
