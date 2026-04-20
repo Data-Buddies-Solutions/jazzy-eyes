@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import type { Frame } from '@/types/admin';
 import { Loader2, Minus, Plus, Package } from 'lucide-react';
 
@@ -37,6 +38,7 @@ export function RestockModal({
     new Date().toISOString().split('T')[0] // Format: YYYY-MM-DD
   );
   const [notes, setNotes] = useState<string>('');
+  const [isSpecialOrder, setIsSpecialOrder] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState(false);
 
   // Reset form when frame changes or modal opens
@@ -46,6 +48,7 @@ export function RestockModal({
       setCostPrice(frame.costPrice.toString());
       setInvoiceDate(new Date().toISOString().split('T')[0]);
       setNotes('');
+      setIsSpecialOrder(false);
     }
   }, [open, frame.frameId, frame.costPrice]);
 
@@ -76,6 +79,7 @@ export function RestockModal({
           costPrice: parseFloat(costPrice),
           invoiceDate: new Date(invoiceDate).toISOString(),
           notes: notes.trim() || undefined,
+          isSpecialOrder,
         }),
       });
 
@@ -88,6 +92,7 @@ export function RestockModal({
         setQuantity(1);
         setCostPrice(frame.costPrice.toString());
         setNotes('');
+        setIsSpecialOrder(false);
         onSuccess();
       } else {
         throw new Error(result.error || 'Failed to restock');
@@ -233,6 +238,22 @@ export function RestockModal({
                 className="border-2 border-black"
                 rows={2}
               />
+            </div>
+
+            {/* Special Order */}
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="restock-isSpecialOrder"
+                checked={isSpecialOrder}
+                onCheckedChange={(v) => setIsSpecialOrder(v === true)}
+                className="border-2 border-black h-5 w-5"
+              />
+              <Label
+                htmlFor="restock-isSpecialOrder"
+                className="font-normal cursor-pointer"
+              >
+                Special order (ordered for a specific patient)
+              </Label>
             </div>
 
             {/* Summary */}

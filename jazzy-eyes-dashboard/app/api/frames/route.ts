@@ -104,6 +104,7 @@ export async function POST(request: NextRequest) {
           unitPrice: data.retailPrice,
           status: 'completed',
           notes: data.notes || null,
+          isSpecialOrder: data.isSpecialOrder ?? false,
         },
       });
 

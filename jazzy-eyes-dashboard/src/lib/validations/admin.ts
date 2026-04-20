@@ -12,6 +12,7 @@ export const frameFormSchema = z.object({
   costPrice: z.coerce.number().nonnegative("Cost price can't be negative"),
   retailPrice: z.coerce.number().nonnegative("Retail price can't be negative"),
   notes: z.string().optional(),
+  isSpecialOrder: z.boolean().default(false),
 });
 
 export const manualSaleSchema = z.object({
@@ -60,6 +61,7 @@ export const restockSchema = z.object({
     .nonnegative("Cost price can't be negative")
     .optional(),
   notes: z.string().optional(),
+  isSpecialOrder: z.boolean().default(false),
 });
 
 export type FrameFormData = z.infer<typeof frameFormSchema>;

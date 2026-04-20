@@ -72,6 +72,7 @@ model InventoryTransaction {
   unitPrice       Decimal         @map("unit_price") @db.Decimal(10, 2)
   status          String          @default("completed") @db.VarChar(50)
   notes           String?
+  isSpecialOrder  Boolean         @default(false) @map("is_special_order")
   writeOffReason  String?         @map("write_off_reason") @db.VarChar(100)
   remainingQty    Int?            @map("remaining_qty")
   revertedFromId  Int?            @map("reverted_from_id")

@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2 } from 'lucide-react';
 
 // Pricing rules by brand name
@@ -40,6 +41,8 @@ const PRICING_RULES: Record<string, { type: 'multiplier' | 'flat'; value: number
   'Chopard': { type: 'multiplier', value: 2.9, round: true },
   'LA Eyeworks': { type: 'multiplier', value: 2.9, round: true },
   'Faniel': { type: 'multiplier', value: 2.9, round: true },
+  'Persol': { type: 'multiplier', value: 2.9, round: true },
+  'Valentino': { type: 'multiplier', value: 2.9, round: true },
   // 2x flat (no rounding)
   'Maui Jim': { type: 'multiplier', value: 2, round: false },
   // $250 flat price
@@ -106,6 +109,7 @@ export function FrameForm({
       costPrice: 0,
       retailPrice: 0,
       notes: '',
+      isSpecialOrder: false,
     },
   });
 
@@ -435,6 +439,19 @@ export function FrameForm({
             {errors.notes && (
               <p className="text-sm text-red-500">{errors.notes.message}</p>
             )}
+          </div>
+
+          {/* Special Order */}
+          <div className="flex items-center space-x-2 pt-2">
+            <Checkbox
+              id="isSpecialOrder"
+              checked={watch('isSpecialOrder') ?? false}
+              onCheckedChange={(v) => setValue('isSpecialOrder', v === true)}
+              className="border-2 border-black h-5 w-5"
+            />
+            <Label htmlFor="isSpecialOrder" className="font-normal cursor-pointer">
+              Special order (ordered for a specific patient)
+            </Label>
           </div>
         </div>
       </Card>

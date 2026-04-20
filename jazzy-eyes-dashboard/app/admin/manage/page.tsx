@@ -381,6 +381,7 @@ export default function ManageInventoryPage() {
                   costPrice: editingFrame.costPrice,
                   retailPrice: editingFrame.retailPrice,
                   notes: editingFrame.notes || '',
+                  isSpecialOrder: editingFrame.isSpecialOrder ?? false,
                 }}
                 isLoading={isSaving}
                 submitLabel="Update Frame"
