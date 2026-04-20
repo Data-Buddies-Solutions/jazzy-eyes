@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2, Printer, FileText } from 'lucide-react';
+import { Loader2, Printer, FileText, PackageCheck } from 'lucide-react';
 
 interface Brand {
   id: number;
@@ -30,6 +30,23 @@ interface Frame {
   retailPrice: number;
 }
 
+interface SpecialOrder {
+  id: number;
+  frameId: string;
+  brand: string;
+  model: string;
+  color: string;
+  frameType: string;
+  productType: string;
+  quantity: number;
+  unitCost: number;
+  unitPrice: number;
+  transactionDate: string;
+  invoiceNumber: string | null;
+  status: string;
+  notes: string | null;
+}
+
 interface ReportData {
   brandName: string;
   summary: {
@@ -37,8 +54,10 @@ interface ReportData {
     activeCount: number;
     soldOutCount: number;
     discontinuedCount: number;
+    specialOrderCount: number;
   };
   frames: Frame[];
+  specialOrders: SpecialOrder[];
 }
 
 export default function InventoryReportPage() {
@@ -48,6 +67,9 @@ export default function InventoryReportPage() {
   const [loading, setLoading] = useState(false);
   const [brandsLoading, setBrandsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [specialOrdersMode, setSpecialOrdersMode] = useState(false);
+  const [allSpecialOrders, setAllSpecialOrders] = useState<SpecialOrder[]>([]);
+  const [specialOrdersLoading, setSpecialOrdersLoading] = useState(false);
 
   // Fetch brands on mount
   useEffect(() => {
@@ -67,8 +89,9 @@ export default function InventoryReportPage() {
     fetchBrands();
   }, []);
 
-  // Fetch report when brand changes
+  // Fetch inventory report when brand changes (normal mode)
   useEffect(() => {
+    if (specialOrdersMode) return;
     if (!selectedBrandId) {
       setReport(null);
       return;
@@ -95,7 +118,48 @@ export default function InventoryReportPage() {
       }
     };
     fetchReport();
-  }, [selectedBrandId]);
+  }, [selectedBrandId, specialOrdersMode]);
+
+  // Fetch special orders (all or filtered by brand)
+  const fetchSpecialOrders = useCallback(async (brandId?: string) => {
+    setSpecialOrdersLoading(true);
+    setError(null);
+    try {
+      const url = brandId
+        ? `/api/reports/special-orders?brandId=${brandId}`
+        : '/api/reports/special-orders';
+      const response = await fetch(url);
+      const data = await response.json();
+      if (data.success) {
+        setAllSpecialOrders(data.specialOrders);
+      } else {
+        setError(data.error || 'Failed to fetch special orders');
+      }
+    } catch (err) {
+      setError('Failed to fetch special orders');
+      console.error('Error fetching special orders:', err);
+    } finally {
+      setSpecialOrdersLoading(false);
+    }
+  }, []);
+
+  // Refetch special orders when brand changes in special orders mode
+  useEffect(() => {
+    if (!specialOrdersMode) return;
+    fetchSpecialOrders(selectedBrandId || undefined);
+  }, [selectedBrandId, specialOrdersMode, fetchSpecialOrders]);
+
+  const handleSpecialOrdersToggle = () => {
+    if (specialOrdersMode) {
+      // Switch back to inventory mode
+      setSpecialOrdersMode(false);
+      setAllSpecialOrders([]);
+    } else {
+      // Switch to special orders mode
+      setSpecialOrdersMode(true);
+      fetchSpecialOrders(selectedBrandId || undefined);
+    }
+  };
 
   const handlePrint = () => {
     window.print();
@@ -107,6 +171,11 @@ export default function InventoryReportPage() {
       currency: 'USD',
     }).format(value);
   };
+
+  const isLoading = loading || specialOrdersLoading;
+  const selectedBrandName = brands.find(
+    (b) => b.id.toString() === selectedBrandId
+  )?.brandName;
 
   return (
     <>
@@ -140,7 +209,7 @@ export default function InventoryReportPage() {
 
           .print-area .summary-cards {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(5, 1fr);
             gap: 8px;
             margin-bottom: 10px;
           }
@@ -211,24 +280,29 @@ export default function InventoryReportPage() {
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
               <FileText className="w-6 h-6" />
-              Inventory Report
+              {specialOrdersMode ? 'Special Orders Report' : 'Inventory Report'}
             </h1>
             <p className="text-gray-600 text-sm">
-              View and print inventory by brand
+              {specialOrdersMode
+                ? 'View all special orders — optionally filter by brand'
+                : 'View and print inventory by brand'}
             </p>
           </div>
 
           <div className="flex items-center gap-3">
             <Select
               value={selectedBrandId}
-              onValueChange={setSelectedBrandId}
+              onValueChange={(val) => setSelectedBrandId(val === 'all' ? '' : val)}
             >
               <SelectTrigger className="w-[200px] border-2 border-black">
                 <SelectValue
-                  placeholder={brandsLoading ? 'Loading...' : 'Select Brand'}
+                  placeholder={brandsLoading ? 'Loading...' : specialOrdersMode ? 'All Brands' : 'Select Brand'}
                 />
               </SelectTrigger>
               <SelectContent>
+                {specialOrdersMode && (
+                  <SelectItem value="all">All Brands</SelectItem>
+                )}
                 {brands.map((brand) => (
                   <SelectItem key={brand.id} value={brand.id.toString()}>
                     {brand.brandName}
@@ -238,8 +312,21 @@ export default function InventoryReportPage() {
             </Select>
 
             <Button
+              onClick={handleSpecialOrdersToggle}
+              variant={specialOrdersMode ? 'default' : 'outline'}
+              className={
+                specialOrdersMode
+                  ? 'bg-blue-600 hover:bg-blue-700 text-white font-semibold border-2 border-black'
+                  : 'font-semibold border-2 border-black'
+              }
+            >
+              <PackageCheck className="w-4 h-4 mr-2" />
+              Special Orders
+            </Button>
+
+            <Button
               onClick={handlePrint}
-              disabled={loading || !report}
+              disabled={isLoading || (!report && !specialOrdersMode) || (specialOrdersMode && allSpecialOrders.length === 0)}
               className="bg-sky-deeper hover:bg-sky-deeper/90 text-black font-semibold border-2 border-black"
             >
               <Printer className="w-4 h-4 mr-2" />
@@ -249,7 +336,7 @@ export default function InventoryReportPage() {
         </div>
 
         {/* Loading State */}
-        {loading && (
+        {isLoading && (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin" />
             <span className="ml-2">Loading report...</span>
@@ -263,8 +350,8 @@ export default function InventoryReportPage() {
           </Card>
         )}
 
-        {/* No Brand Selected */}
-        {!selectedBrandId && !loading && (
+        {/* No Brand Selected (inventory mode only) */}
+        {!specialOrdersMode && !selectedBrandId && !isLoading && (
           <Card className="p-8 border-2 border-black text-center">
             <FileText className="w-12 h-12 mx-auto text-gray-400 mb-4" />
             <h3 className="text-lg font-semibold">Select a Brand</h3>
@@ -274,8 +361,149 @@ export default function InventoryReportPage() {
           </Card>
         )}
 
-        {/* Report Content */}
-        {!loading && report && report.frames.length > 0 && (
+        {/* === SPECIAL ORDERS MODE === */}
+        {specialOrdersMode && !specialOrdersLoading && (
+          <div className="print-area space-y-6">
+            {/* Report Header */}
+            <div className="report-header text-center border-b-2 border-black pb-4">
+              <h1 className="text-2xl font-bold">Jazzy Eyes</h1>
+              <h2 className="text-xl font-semibold mt-1">
+                Special Orders Report{selectedBrandName ? ` — ${selectedBrandName}` : ' — All Brands'}
+              </h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Generated:{' '}
+                {new Date().toLocaleDateString('en-US', {
+                  month: 'long',
+                  day: 'numeric',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </p>
+            </div>
+
+            {/* Summary */}
+            <div className="summary-cards grid grid-cols-2 md:grid-cols-3 gap-4">
+              <Card className="p-4 border-2 border-black">
+                <p className="text-sm text-gray-600">Total Special Orders</p>
+                <p className="text-2xl font-bold text-blue-600">
+                  {allSpecialOrders.length}
+                </p>
+              </Card>
+              <Card className="p-4 border-2 border-black">
+                <p className="text-sm text-gray-600">Total Cost</p>
+                <p className="text-2xl font-bold">
+                  {formatCurrency(
+                    allSpecialOrders.reduce((sum, o) => sum + o.unitCost * o.quantity, 0)
+                  )}
+                </p>
+              </Card>
+              <Card className="p-4 border-2 border-black">
+                <p className="text-sm text-gray-600">Total Retail</p>
+                <p className="text-2xl font-bold">
+                  {formatCurrency(
+                    allSpecialOrders.reduce((sum, o) => sum + o.unitPrice * o.quantity, 0)
+                  )}
+                </p>
+              </Card>
+            </div>
+
+            {/* Special Orders Table */}
+            {allSpecialOrders.length === 0 ? (
+              <Card className="p-8 border-2 border-black text-center">
+                <PackageCheck className="w-12 h-12 mx-auto text-gray-400 mb-4" />
+                <h3 className="text-lg font-semibold">No Special Orders</h3>
+                <p className="text-gray-600">
+                  {selectedBrandName
+                    ? `No special orders found for ${selectedBrandName}`
+                    : 'No special orders found'}
+                </p>
+              </Card>
+            ) : (
+              <Card className="print-card p-4 border-2 border-black">
+                <h2 className="text-lg font-bold mb-3">
+                  Special Orders ({allSpecialOrders.length})
+                </h2>
+                <div className="overflow-x-auto">
+                  <table className="inventory-table w-full text-sm">
+                    <thead>
+                      <tr className="border-b-2 border-black">
+                        <th className="text-left py-2 px-1">Frame ID</th>
+                        <th className="text-left py-2 px-1">Brand</th>
+                        <th className="text-left py-2 px-1">Model</th>
+                        <th className="text-left py-2 px-1">Color</th>
+                        <th className="text-center py-2 px-1">Qty</th>
+                        <th className="text-right py-2 px-1">Cost</th>
+                        <th className="text-right py-2 px-1">Retail</th>
+                        <th className="text-left py-2 px-1">Date</th>
+                        <th className="text-left py-2 px-1">Invoice</th>
+                        <th className="text-left py-2 px-1">Status</th>
+                        <th className="text-left py-2 px-1">Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allSpecialOrders.map((order, index) => (
+                        <tr
+                          key={order.id}
+                          className={index % 2 === 0 ? 'bg-gray-50' : ''}
+                        >
+                          <td className="py-1.5 px-1 font-medium">
+                            {order.frameId}
+                          </td>
+                          <td className="py-1.5 px-1">{order.brand}</td>
+                          <td className="py-1.5 px-1">{order.model}</td>
+                          <td className="py-1.5 px-1">{order.color}</td>
+                          <td className="text-center py-1.5 px-1">
+                            {order.quantity}
+                          </td>
+                          <td className="text-right py-1.5 px-1">
+                            {formatCurrency(order.unitCost)}
+                          </td>
+                          <td className="text-right py-1.5 px-1">
+                            {formatCurrency(order.unitPrice)}
+                          </td>
+                          <td className="py-1.5 px-1">
+                            {new Date(order.transactionDate).toLocaleDateString()}
+                          </td>
+                          <td className="py-1.5 px-1">
+                            {order.invoiceNumber || '—'}
+                          </td>
+                          <td className="py-1.5 px-1">
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-xs font-medium ${
+                                order.status === 'completed'
+                                  ? 'bg-green-100 text-green-700'
+                                  : order.status === 'pending'
+                                  ? 'bg-yellow-100 text-yellow-700'
+                                  : 'bg-blue-100 text-blue-700'
+                              }`}
+                            >
+                              {order.status}
+                            </span>
+                          </td>
+                          <td className="py-1.5 px-1 text-gray-600 truncate max-w-[150px]">
+                            {order.notes || '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            )}
+
+            {/* Footer */}
+            <div className="report-footer text-center text-sm text-gray-500 pt-4 border-t">
+              <p>
+                Jazzy Eyes — Special Orders Report
+                {selectedBrandName ? ` — ${selectedBrandName}` : ''}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* === INVENTORY MODE === */}
+        {!specialOrdersMode && !loading && report && (report.frames.length > 0 || report.specialOrders.length > 0) && (
           <div className="print-area space-y-6">
             {/* Report Header */}
             <div className="report-header text-center border-b-2 border-black pb-4">
@@ -296,7 +524,7 @@ export default function InventoryReportPage() {
             </div>
 
             {/* Summary Cards */}
-            <div className="summary-cards grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="summary-cards grid grid-cols-2 md:grid-cols-5 gap-4">
               <Card className="p-4 border-2 border-black">
                 <p className="text-sm text-gray-600">Total Frames</p>
                 <p className="text-2xl font-bold">
@@ -321,6 +549,14 @@ export default function InventoryReportPage() {
                   {report.summary.discontinuedCount}
                 </p>
               </Card>
+              {report.summary.specialOrderCount > 0 && (
+                <Card className="p-4 border-2 border-black">
+                  <p className="text-sm text-gray-600">Special Orders</p>
+                  <p className="text-2xl font-bold text-blue-600">
+                    {report.summary.specialOrderCount}
+                  </p>
+                </Card>
+              )}
             </div>
 
             {/* Inventory Table */}
@@ -379,6 +615,78 @@ export default function InventoryReportPage() {
               </div>
             </Card>
 
+            {/* Special Orders in Inventory Mode */}
+            {report.specialOrders.length > 0 && (
+              <Card className="print-card p-4 border-2 border-black">
+                <h2 className="text-lg font-bold mb-3">
+                  Special Orders ({report.specialOrders.length})
+                </h2>
+                <div className="overflow-x-auto">
+                  <table className="inventory-table w-full text-sm">
+                    <thead>
+                      <tr className="border-b-2 border-black">
+                        <th className="text-left py-2 px-1">Frame ID</th>
+                        <th className="text-left py-2 px-1">Model</th>
+                        <th className="text-left py-2 px-1">Color</th>
+                        <th className="text-center py-2 px-1">Qty</th>
+                        <th className="text-right py-2 px-1">Cost</th>
+                        <th className="text-right py-2 px-1">Retail</th>
+                        <th className="text-left py-2 px-1">Date</th>
+                        <th className="text-left py-2 px-1">Invoice</th>
+                        <th className="text-left py-2 px-1">Status</th>
+                        <th className="text-left py-2 px-1">Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {report.specialOrders.map((order, index) => (
+                        <tr
+                          key={order.id}
+                          className={index % 2 === 0 ? 'bg-gray-50' : ''}
+                        >
+                          <td className="py-1.5 px-1 font-medium">
+                            {order.frameId}
+                          </td>
+                          <td className="py-1.5 px-1">{order.model}</td>
+                          <td className="py-1.5 px-1">{order.color}</td>
+                          <td className="text-center py-1.5 px-1">
+                            {order.quantity}
+                          </td>
+                          <td className="text-right py-1.5 px-1">
+                            {formatCurrency(order.unitCost)}
+                          </td>
+                          <td className="text-right py-1.5 px-1">
+                            {formatCurrency(order.unitPrice)}
+                          </td>
+                          <td className="py-1.5 px-1">
+                            {new Date(order.transactionDate).toLocaleDateString()}
+                          </td>
+                          <td className="py-1.5 px-1">
+                            {order.invoiceNumber || '—'}
+                          </td>
+                          <td className="py-1.5 px-1">
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-xs font-medium ${
+                                order.status === 'completed'
+                                  ? 'bg-green-100 text-green-700'
+                                  : order.status === 'pending'
+                                  ? 'bg-yellow-100 text-yellow-700'
+                                  : 'bg-blue-100 text-blue-700'
+                              }`}
+                            >
+                              {order.status}
+                            </span>
+                          </td>
+                          <td className="py-1.5 px-1 text-gray-600 truncate max-w-[150px]">
+                            {order.notes || '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            )}
+
             {/* Footer */}
             <div className="report-footer text-center text-sm text-gray-500 pt-4 border-t">
               <p>Jazzy Eyes — Inventory Report — {report.brandName}</p>
@@ -386,8 +694,8 @@ export default function InventoryReportPage() {
           </div>
         )}
 
-        {/* No Data State */}
-        {!loading && report && report.frames.length === 0 && (
+        {/* No Data State (inventory mode) */}
+        {!specialOrdersMode && !loading && report && report.frames.length === 0 && report.specialOrders.length === 0 && (
           <Card className="p-8 border-2 border-black text-center">
             <FileText className="w-12 h-12 mx-auto text-gray-400 mb-4" />
             <h3 className="text-lg font-semibold">No Frames Found</h3>

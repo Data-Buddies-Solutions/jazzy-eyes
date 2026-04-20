@@ -154,7 +154,13 @@ export async function PUT(
     }
 
     // If cost/retail prices or invoice info changed, update the latest ORDER transaction
-    if (body.costPrice !== undefined || body.retailPrice !== undefined || body.notes !== undefined || body.invoiceDate !== undefined) {
+    if (
+      body.costPrice !== undefined ||
+      body.retailPrice !== undefined ||
+      body.notes !== undefined ||
+      body.invoiceDate !== undefined ||
+      body.isSpecialOrder !== undefined
+    ) {
       const productIdForTransaction = idChanged ? newCompositeId : compositeId;
       const latestOrder = await prisma.inventoryTransaction.findFirst({
         where: { productId: productIdForTransaction, transactionType: 'ORDER' },
@@ -169,6 +175,7 @@ export async function PUT(
             unitPrice: body.retailPrice !== undefined ? body.retailPrice : latestOrder.unitPrice,
             invoiceDate: body.invoiceDate !== undefined ? (body.invoiceDate ? new Date(body.invoiceDate) : null) : latestOrder.invoiceDate,
             notes: body.notes !== undefined ? body.notes : latestOrder.notes,
+            isSpecialOrder: body.isSpecialOrder !== undefined ? body.isSpecialOrder : latestOrder.isSpecialOrder,
           },
         });
       }
@@ -633,7 +640,7 @@ export async function PATCH(
 
     // ========== RESTOCK ==========
     if (action === 'restock') {
-      const { quantity, invoiceDate, costPrice, notes } = body;
+      const { quantity, invoiceDate, costPrice, notes, isSpecialOrder } = body;
 
       // Validate quantity
       if (!quantity || quantity < 1) {
@@ -675,6 +682,7 @@ export async function PATCH(
             status: 'completed',
             remainingQty: quantity, // New batch for FIFO
             notes: notes || null,
+            isSpecialOrder: isSpecialOrder === true,
           },
         }),
         prisma.product.update({

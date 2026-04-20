@@ -24,6 +24,7 @@ export interface Frame {
   saleDate?: string;
   salePrice?: number;
   currentQty: number;
+  isSpecialOrder?: boolean;
 }
 
 export interface FrameFormData {
@@ -38,6 +39,7 @@ export interface FrameFormData {
   costPrice: number;
   retailPrice: number;
   notes?: string;
+  isSpecialOrder?: boolean;
 }
 
 export interface AddFrameResponse {
@@ -75,6 +77,7 @@ export interface RestockData {
   invoiceDate?: string;
   costPrice?: number;
   notes?: string;
+  isSpecialOrder?: boolean;
 }
 
 export interface InventoryTransactionRecord {

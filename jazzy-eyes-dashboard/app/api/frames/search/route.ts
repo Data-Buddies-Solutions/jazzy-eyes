@@ -140,6 +140,7 @@ export async function GET(request: NextRequest) {
           styleNumber: product.styleNumber,
           colorCode: product.colorCode,
           currentQty: product.currentQty,
+          isSpecialOrder: orderTransaction?.isSpecialOrder ?? false,
         };
       });
 

@@ -89,6 +89,42 @@ export async function GET(request: NextRequest) {
       (p) => p.status?.name === 'Discontinued'
     ).length;
 
+    // Fetch special orders for this brand
+    const specialOrders = await prisma.inventoryTransaction.findMany({
+      where: {
+        isSpecialOrder: true,
+        product: { brandId: brandIdNum },
+      },
+      include: {
+        product: {
+          select: {
+            compositeId: true,
+            styleNumber: true,
+            colorCode: true,
+            frameType: true,
+            productType: true,
+          },
+        },
+      },
+      orderBy: { transactionDate: 'desc' },
+    });
+
+    const specialOrderItems = specialOrders.map((so) => ({
+      id: so.id,
+      frameId: so.product.compositeId,
+      model: so.product.styleNumber,
+      color: so.product.colorCode,
+      frameType: so.product.frameType,
+      productType: so.product.productType,
+      quantity: so.quantity,
+      unitCost: Number(so.unitCost),
+      unitPrice: Number(so.unitPrice),
+      transactionDate: so.transactionDate.toISOString(),
+      invoiceNumber: so.invoiceNumber,
+      status: so.status,
+      notes: so.notes,
+    }));
+
     return NextResponse.json({
       success: true,
       brandName: brand.brandName,
@@ -97,8 +133,10 @@ export async function GET(request: NextRequest) {
         activeCount,
         soldOutCount,
         discontinuedCount,
+        specialOrderCount: specialOrderItems.length,
       },
       frames,
+      specialOrders: specialOrderItems,
     });
   } catch (error) {
     console.error('Error fetching inventory report:', error);
