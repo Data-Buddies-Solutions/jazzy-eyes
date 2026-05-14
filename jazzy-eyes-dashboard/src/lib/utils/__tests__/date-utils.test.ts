@@ -70,6 +70,12 @@ describe('getDateRangePreset', () => {
     expect(toISODateString(endDate)).toBe('2025-01-15');
   });
 
+  it('returns correct range for Last 60 days', () => {
+    const { startDate, endDate } = getDateRangePreset('Last 60 days');
+    expect(toISODateString(startDate)).toBe('2024-11-16');
+    expect(toISODateString(endDate)).toBe('2025-01-15');
+  });
+
   it('returns correct range for Last 90 days', () => {
     const { startDate, endDate } = getDateRangePreset('Last 90 days');
     expect(toISODateString(startDate)).toBe('2024-10-17');
@@ -111,6 +117,7 @@ describe('DATE_RANGE_PRESETS', () => {
   it('contains all expected presets', () => {
     expect(DATE_RANGE_PRESETS).toContain('Last 7 days');
     expect(DATE_RANGE_PRESETS).toContain('Last 30 days');
+    expect(DATE_RANGE_PRESETS).toContain('Last 60 days');
     expect(DATE_RANGE_PRESETS).toContain('Last 90 days');
     expect(DATE_RANGE_PRESETS).toContain('This Month');
     expect(DATE_RANGE_PRESETS).toContain('Last Month');
@@ -118,7 +125,7 @@ describe('DATE_RANGE_PRESETS', () => {
     expect(DATE_RANGE_PRESETS).toContain('All Time');
   });
 
-  it('has exactly 7 presets', () => {
-    expect(DATE_RANGE_PRESETS).toHaveLength(7);
+  it('has exactly 8 presets', () => {
+    expect(DATE_RANGE_PRESETS).toHaveLength(8);
   });
 });

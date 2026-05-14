@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { calculateHistoricalInventoryMetrics } from '@/lib/analytics/inventory-metrics';
 import type { SellThroughResponse } from '@/types/analytics';
 
 export async function GET(request: NextRequest) {
@@ -33,9 +34,7 @@ export async function GET(request: NextRequest) {
               where: {
                 transactionDate: {
                   gte: startDate,
-                  lte: endDate,
                 },
-                transactionType: 'SALE',
               },
             },
           },
@@ -57,29 +56,18 @@ export async function GET(request: NextRequest) {
     // Calculate sell-through metrics for each brand
     const sellThroughData = brands
       .map((brand) => {
-        // Current inventory (not sold)
-        const currentInventory = brand.products.filter(
-          (p) => p.status?.name !== 'Sold'
-        ).length;
-
-        // Inventory sold in period
-        const inventorySoldInPeriod = brand.products.filter((p) =>
-          p.transactions.some((t) => t.transactionType === 'SALE')
-        ).length;
+        const {
+          currentInventory,
+          startingInventory,
+          unitsAddedInPeriod,
+          availableInventory,
+          inventorySoldInPeriod,
+          unitsWrittenOffInPeriod,
+          sellThroughRate,
+        } = calculateHistoricalInventoryMetrics(brand.products, startDate, endDate);
 
         // RX sold in period (doesn't affect inventory)
         const rxSoldInPeriod = brand.rxSales.length;
-
-        // Total sold (inventory + RX)
-        const totalSoldInPeriod = inventorySoldInPeriod + rxSoldInPeriod;
-
-        // Calculate sell-through rate (inventory only - RX doesn't come from inventory)
-        const totalUnits = inventorySoldInPeriod + currentInventory;
-        const sellThroughRate =
-          totalUnits > 0 ? (inventorySoldInPeriod / totalUnits) * 100 : 0;
-
-        // Calculate velocity (all units per day including RX)
-        const velocity = daysInPeriod > 0 ? totalSoldInPeriod / daysInPeriod : 0;
 
         // Determine status based on sell-through rate
         let status: 'excellent' | 'good' | 'slow' | 'stale';
@@ -96,15 +84,24 @@ export async function GET(request: NextRequest) {
         return {
           brandName: brand.brandName,
           currentInventory,
-          soldInPeriod: totalSoldInPeriod,
+          availableInventory,
+          startingInventory,
+          unitsAddedInPeriod,
+          unitsWrittenOffInPeriod,
+          soldInPeriod: inventorySoldInPeriod,
           inventorySold: inventorySoldInPeriod,
           rxSold: rxSoldInPeriod,
           sellThroughRate,
-          velocity,
+          velocity: daysInPeriod > 0 ? inventorySoldInPeriod / daysInPeriod : 0,
           status,
         };
       })
-      .filter((brand) => brand.currentInventory > 0 || brand.soldInPeriod > 0); // Only include brands with activity
+      .filter(
+        (brand) =>
+          brand.currentInventory > 0 ||
+          (brand.availableInventory ?? 0) > 0 ||
+          brand.soldInPeriod > 0
+      ); // Only include brands with inventory or activity
 
     // Sort by sell-through rate descending
     sellThroughData.sort((a, b) => b.sellThroughRate - a.sellThroughRate);
@@ -113,13 +110,13 @@ export async function GET(request: NextRequest) {
     const totalSold = sellThroughData.reduce((sum, b) => sum + b.soldInPeriod, 0);
     const totalInventorySold = sellThroughData.reduce((sum, b) => sum + b.inventorySold, 0);
     const totalRxSold = sellThroughData.reduce((sum, b) => sum + b.rxSold, 0);
-    const totalInventory = sellThroughData.reduce(
-      (sum, b) => sum + b.currentInventory,
+    const totalAvailableInventory = sellThroughData.reduce(
+      (sum, b) => sum + (b.availableInventory ?? 0),
       0
     );
     const overallSellThrough =
-      totalInventorySold + totalInventory > 0
-        ? (totalInventorySold / (totalInventorySold + totalInventory)) * 100
+      totalAvailableInventory > 0
+        ? (totalInventorySold / totalAvailableInventory) * 100
         : 0;
 
     const fastestMoving =

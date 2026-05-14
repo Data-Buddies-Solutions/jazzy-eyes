@@ -12,7 +12,11 @@ export interface BrandPerformanceData {
   brandName: string;
   companyName: string;
   allocationQuantity: number;
-  totalInventory: number; // Active + non-sold
+  totalInventory: number; // Current quantity on hand
+  availableInventory?: number; // Starting quantity + period additions
+  startingInventory?: number; // Quantity on hand at the start of the period
+  unitsAddedInPeriod?: number; // ORDER + RESTOCK + REVERT_WRITE_OFF quantities
+  unitsWrittenOffInPeriod?: number;
   totalSold: number; // Sold in period (inventory + RX)
   inventorySold?: number; // Inventory sales only
   rxSold?: number; // RX sales only
@@ -30,12 +34,16 @@ export interface BrandPerformanceResponse {
 // Sell-Through Types
 export interface SellThroughData {
   brandName: string;
-  currentInventory: number;
-  soldInPeriod: number; // Total sold (inventory + RX)
+  currentInventory: number; // Current quantity on hand
+  availableInventory?: number; // Starting quantity + period additions
+  startingInventory?: number; // Quantity on hand at the start of the period
+  unitsAddedInPeriod?: number; // ORDER + RESTOCK + REVERT_WRITE_OFF quantities
+  unitsWrittenOffInPeriod?: number;
+  soldInPeriod: number; // Inventory sold in period
   inventorySold?: number; // Inventory sales only
   rxSold?: number; // RX sales only
   sellThroughRate: number; // % (inventory only)
-  velocity: number; // units/day (all sales)
+  velocity: number; // inventory units sold / day
   status: 'excellent' | 'good' | 'slow' | 'stale';
 }
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { calculateHistoricalInventoryMetrics } from '@/lib/analytics/inventory-metrics';
 import type { BrandPerformanceResponse } from '@/types/analytics';
 
 export async function GET(request: NextRequest) {
@@ -28,7 +29,6 @@ export async function GET(request: NextRequest) {
               where: {
                 transactionDate: {
                   gte: startDate,
-                  lte: endDate,
                 },
               },
             },
@@ -53,26 +53,35 @@ export async function GET(request: NextRequest) {
       // Get all products for this brand
       const allProducts = brand.products;
 
-      // Current inventory: products not sold
-      const totalInventory = allProducts.filter(
-        (p) => p.status?.name !== 'Sold'
-      ).length;
+      const {
+        currentInventory: totalInventory,
+        startingInventory,
+        unitsAddedInPeriod,
+        availableInventory,
+        inventorySoldInPeriod: inventorySold,
+        unitsWrittenOffInPeriod,
+        sellThroughRate,
+      } = calculateHistoricalInventoryMetrics(allProducts, startDate, endDate);
 
       // Get sale transactions in date range (inventory sales)
       const saleTransactions = allProducts.flatMap((p) =>
-        p.transactions.filter((t) => t.transactionType === 'SALE')
+        p.transactions.filter(
+          (t) =>
+            t.transactionType === 'SALE' &&
+            t.transactionDate >= startDate &&
+            t.transactionDate <= endDate
+        )
       );
 
       // Get RX sales in date range
       const rxSales = brand.rxSales;
 
-      const inventorySold = saleTransactions.length;
       const rxSold = rxSales.length;
       const totalSold = inventorySold + rxSold;
 
       // Calculate revenue (inventory + RX)
       const inventoryRevenue = saleTransactions.reduce(
-        (sum, t) => sum + Number(t.unitPrice),
+        (sum, t) => sum + Number(t.unitPrice) * t.quantity,
         0
       );
       const rxRevenue = rxSales.reduce(
@@ -133,10 +142,6 @@ export async function GET(request: NextRequest) {
         avgMargin = marginsCount > 0 ? marginsSum / marginsCount : 0;
       }
 
-      // Calculate sell-through rate (inventory only - RX doesn't affect inventory)
-      const totalUnits = inventorySold + totalInventory;
-      const sellThroughRate = totalUnits > 0 ? (inventorySold / totalUnits) * 100 : 0;
-
       // Reorder recommendation: inventory < 20% of allocation
       const reorderRecommended =
         totalInventory < brand.allocationQuantity * 0.2;
@@ -147,6 +152,10 @@ export async function GET(request: NextRequest) {
         companyName: brand.companyName,
         allocationQuantity: brand.allocationQuantity,
         totalInventory,
+        availableInventory,
+        startingInventory,
+        unitsAddedInPeriod,
+        unitsWrittenOffInPeriod,
         totalSold,
         inventorySold,
         rxSold,
