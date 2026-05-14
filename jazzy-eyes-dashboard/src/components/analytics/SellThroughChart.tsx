@@ -139,12 +139,11 @@ export function SellThroughChart({ dateRange }: SellThroughChartProps) {
                     Sold: <span className="font-semibold">{data.soldInPeriod}</span>
                   </p>
                   <p className="text-sm">
-                    In Stock: <span className="font-semibold">{data.currentInventory}</span>
+                    Available: <span className="font-semibold">{data.availableInventory}</span>
                   </p>
                   <p className="text-sm">
-                    Velocity: <span className="font-semibold">{data.velocity.toFixed(2)} units/day</span>
+                    Write-Offs: <span className="font-semibold">{data.unitsWrittenOffInPeriod}</span>
                   </p>
-                  <p className="text-sm font-semibold mt-1 capitalize">{data.status}</p>
                 </div>
               );
             }}

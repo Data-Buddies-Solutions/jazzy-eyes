@@ -22,6 +22,9 @@ export function getDateRangePreset(preset: string): {
     case 'Last 30 days':
       startDate.setDate(now.getDate() - 30);
       break;
+    case 'Last 60 days':
+      startDate.setDate(now.getDate() - 60);
+      break;
     case 'Last 90 days':
       startDate.setDate(now.getDate() - 90);
       break;
@@ -101,6 +104,7 @@ export function daysBetween(start: Date, end: Date): number {
 export const DATE_RANGE_PRESETS = [
   'Last 7 days',
   'Last 30 days',
+  'Last 60 days',
   'Last 90 days',
   'This Month',
   'Last Month',
