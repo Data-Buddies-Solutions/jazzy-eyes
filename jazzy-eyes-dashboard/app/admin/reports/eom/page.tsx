@@ -40,6 +40,26 @@ interface BrandSummary {
   marginPercent: number;
 }
 
+interface ReturnBrandSummary {
+  brandName: string;
+  returnedUnits: number;
+  startingCreditBalance: number;
+  creditGenerated: number;
+  creditsApplied: number;
+  endingCreditBalance: number;
+}
+
+interface ReturnRow {
+  brandName: string;
+  styleNumber: string;
+  colorCode: string;
+  eyeSize: string;
+  date: string;
+  quantity: number;
+  creditPerUnit: number;
+  creditValue: number;
+}
+
 interface ReportData {
   period: {
     year: number;
@@ -58,8 +78,14 @@ interface ReportData {
     totalProfit: number;
     averageMargin: number;
     averageSalePrice: number;
+    totalReturnedUnits: number;
+    totalCreditGenerated: number;
+    totalCreditsApplied: number;
+    totalOutstandingCredit: number;
   };
   brandSummary: BrandSummary[];
+  returnsBrandSummary: ReturnBrandSummary[];
+  returnRows: ReturnRow[];
   sales: SaleItem[];
 }
 
@@ -166,7 +192,7 @@ export default function EOMReportPage() {
           /* Summary cards row */
           .print-area .summary-cards {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(6, 1fr);
             gap: 8px;
             margin-bottom: 10px;
           }
@@ -311,7 +337,7 @@ export default function EOMReportPage() {
         )}
 
         {/* Report Content */}
-        {!loading && report && report.sales.length > 0 && (
+        {!loading && report && (report.sales.length > 0 || report.returnRows.length > 0) && (
           <div ref={printRef} className="print-area space-y-6">
             {/* Report Header */}
             <div className="report-header text-center border-b-2 border-black pb-4">
@@ -333,37 +359,62 @@ export default function EOMReportPage() {
               </p>
             </div>
 
-            {/* Summary Cards */}
-            <div className="summary-cards grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Card className="p-4 border-2 border-black">
-                <p className="text-sm text-gray-600">Total Units Sold</p>
-                <p className="text-2xl font-bold">{report.summary.totalUnits}</p>
-                <p className="text-xs text-gray-500">
-                  {report.summary.inventoryUnits} Inventory | {report.summary.rxUnits} RX
-                </p>
-              </Card>
-              <Card className="p-4 border-2 border-black">
-                <p className="text-sm text-gray-600">Total Revenue</p>
-                <p className="text-2xl font-bold text-green-600">
-                  {formatCurrency(report.summary.totalRevenue)}
-                </p>
-              </Card>
-              <Card className="p-4 border-2 border-black">
-                <p className="text-sm text-gray-600">Total Cost</p>
-                <p className="text-2xl font-bold text-red-600">
-                  {formatCurrency(report.summary.totalCost)}
-                </p>
-              </Card>
-              <Card className="p-4 border-2 border-black">
-                <p className="text-sm text-gray-600">Gross Profit</p>
-                <p className="text-2xl font-bold text-blue-600">
-                  {formatCurrency(report.summary.totalProfit)}
-                </p>
-                <p className="text-xs text-gray-500">
-                  {report.summary.averageMargin.toFixed(1)}% margin
-                </p>
-              </Card>
-            </div>
+            {(() => {
+              const adjustedProfit = report.summary.totalProfit + report.summary.totalCreditsApplied;
+              const adjustedMargin =
+                report.summary.totalRevenue > 0
+                  ? (adjustedProfit / report.summary.totalRevenue) * 100
+                  : 0;
+              return (
+                <div className="summary-cards grid grid-cols-2 md:grid-cols-6 gap-4">
+                  <Card className="p-4 border-2 border-black">
+                    <p className="text-sm text-gray-600">Units Sold</p>
+                    <p className="text-2xl font-bold">{report.summary.totalUnits}</p>
+                    <p className="text-xs text-gray-500">
+                      {report.summary.inventoryUnits} Inv · {report.summary.rxUnits} RX
+                    </p>
+                  </Card>
+                  <Card className="p-4 border-2 border-black">
+                    <p className="text-sm text-gray-600">Revenue</p>
+                    <p className="text-2xl font-bold text-green-600">
+                      {formatCurrency(report.summary.totalRevenue)}
+                    </p>
+                  </Card>
+                  <Card className="p-4 border-2 border-black">
+                    <p className="text-sm text-gray-600">Cost</p>
+                    <p className="text-2xl font-bold text-red-600">
+                      {formatCurrency(report.summary.totalCost)}
+                    </p>
+                  </Card>
+                  <Card className="p-4 border-2 border-black">
+                    <p className="text-sm text-gray-600">Gross Profit</p>
+                    <p className="text-2xl font-bold text-blue-600">{formatCurrency(adjustedProfit)}</p>
+                    <p className="text-xs text-gray-500">
+                      {adjustedMargin.toFixed(1)}% margin
+                      {report.summary.totalCreditsApplied > 0 && ' · incl. credits'}
+                    </p>
+                  </Card>
+                  <Card className="p-4 border-2 border-black bg-blue-50">
+                    <p className="text-sm text-gray-600">Returns</p>
+                    <p className="text-2xl font-bold text-blue-700">
+                      {report.summary.totalReturnedUnits} units
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {formatCurrency(report.summary.totalCreditGenerated)} generated
+                    </p>
+                  </Card>
+                  <Card className="p-4 border-2 border-black bg-amber-50">
+                    <p className="text-sm text-gray-600">Carry to next month</p>
+                    <p className="text-2xl font-bold text-amber-700">
+                      {formatCurrency(report.summary.totalOutstandingCredit)}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {formatCurrency(report.summary.totalCreditsApplied)} applied this month
+                    </p>
+                  </Card>
+                </div>
+              );
+            })()}
 
             {/* Brand Summary Table */}
             <div className="brand-section">
@@ -407,6 +458,107 @@ export default function EOMReportPage() {
               </div>
             </Card>
             </div>
+
+            {/* Returns Section */}
+            {(report.returnRows.length > 0 || report.returnsBrandSummary.length > 0) && (
+              <div className="brand-section">
+                <Card className="print-card p-4 border-2 border-black bg-blue-50/30">
+                  <h2 className="text-lg font-bold mb-3">Returns &amp; Vendor Credits</h2>
+
+                  <h3 className="text-sm font-semibold mb-2">By brand</h3>
+                  <div className="overflow-x-auto mb-4">
+                    <table className="brand-table w-full text-sm">
+                      <thead>
+                        <tr className="border-b-2 border-black">
+                          <th className="text-left py-2 px-2">Brand</th>
+                          <th className="text-right py-2 px-2">Units returned</th>
+                          <th className="text-right py-2 px-2">Starting balance</th>
+                          <th className="text-right py-2 px-2">Generated</th>
+                          <th className="text-right py-2 px-2">Credits applied</th>
+                          <th className="text-right py-2 px-2">Carry to next month</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {report.returnsBrandSummary.map((b) => (
+                          <tr key={b.brandName} className="border-b border-gray-200">
+                            <td className="py-2 px-2 font-medium">{b.brandName}</td>
+                            <td className="text-right py-2 px-2">{b.returnedUnits || '—'}</td>
+                            <td className="text-right py-2 px-2 text-gray-600">
+                              {formatCurrency(b.startingCreditBalance)}
+                            </td>
+                            <td className="text-right py-2 px-2 text-blue-700">
+                              {formatCurrency(b.creditGenerated)}
+                            </td>
+                            <td className="text-right py-2 px-2 text-green-700">
+                              −{formatCurrency(b.creditsApplied)}
+                            </td>
+                            <td className="text-right py-2 px-2 font-bold">
+                              {formatCurrency(b.endingCreditBalance)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="border-t-2 border-black font-bold">
+                          <td className="py-2 px-2">TOTAL</td>
+                          <td className="text-right py-2 px-2">{report.summary.totalReturnedUnits}</td>
+                          <td className="text-right py-2 px-2"></td>
+                          <td className="text-right py-2 px-2 text-blue-700">
+                            {formatCurrency(report.summary.totalCreditGenerated)}
+                          </td>
+                          <td className="text-right py-2 px-2 text-green-700">
+                            −{formatCurrency(report.summary.totalCreditsApplied)}
+                          </td>
+                          <td className="text-right py-2 px-2">
+                            {formatCurrency(report.summary.totalOutstandingCredit)}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+
+                  {report.returnRows.length > 0 && (
+                    <>
+                      <h3 className="text-sm font-semibold mb-2">
+                        Return transactions ({report.returnRows.length})
+                      </h3>
+                      <div className="overflow-x-auto">
+                        <table className="brand-table w-full text-sm">
+                          <thead>
+                            <tr className="border-b-2 border-black">
+                              <th className="text-left py-2 px-2">Date</th>
+                              <th className="text-left py-2 px-2">Brand</th>
+                              <th className="text-left py-2 px-2">Style #</th>
+                              <th className="text-left py-2 px-2">Color</th>
+                              <th className="text-left py-2 px-2">Size</th>
+                              <th className="text-center py-2 px-2">Qty</th>
+                              <th className="text-right py-2 px-2">Credit / unit</th>
+                              <th className="text-right py-2 px-2">Credit value</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {report.returnRows.map((r, idx) => (
+                              <tr key={idx} className={idx % 2 === 0 ? 'bg-gray-50' : ''}>
+                                <td className="py-1.5 px-2">{formatDate(r.date)}</td>
+                                <td className="py-1.5 px-2 font-medium">{r.brandName}</td>
+                                <td className="py-1.5 px-2">{r.styleNumber}</td>
+                                <td className="py-1.5 px-2">{r.colorCode}</td>
+                                <td className="py-1.5 px-2">{r.eyeSize}</td>
+                                <td className="text-center py-1.5 px-2">{r.quantity}</td>
+                                <td className="text-right py-1.5 px-2">{formatCurrency(r.creditPerUnit)}</td>
+                                <td className="text-right py-1.5 px-2 font-medium">
+                                  {formatCurrency(r.creditValue)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  )}
+                </Card>
+              </div>
+            )}
 
             {/* Detailed Sales Table */}
             <Card className="print-card p-4 border-2 border-black">
@@ -472,7 +624,7 @@ export default function EOMReportPage() {
         )}
 
         {/* No Data State */}
-        {!loading && report && report.sales.length === 0 && (
+        {!loading && report && report.sales.length === 0 && report.returnRows.length === 0 && (
           <Card className="p-8 border-2 border-black text-center">
             <FileText className="w-12 h-12 mx-auto text-gray-400 mb-4" />
             <h3 className="text-lg font-semibold">No Sales Found</h3>

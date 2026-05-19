@@ -95,7 +95,7 @@ export function SalesTrendsChart({ dateRange }: SalesTrendsChartProps) {
         <MetricCard
           title="Best Day"
           value={`$${data.summary.bestDay.revenue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
-          subtitle={new Date(data.summary.bestDay.date).toLocaleDateString()}
+          subtitle={new Date(data.summary.bestDay.date).toLocaleDateString('en-US', { timeZone: 'UTC' })}
           icon={<Calendar className="w-5 h-5" />}
           className="border-green-500"
         />
@@ -114,11 +114,11 @@ export function SalesTrendsChart({ dateRange }: SalesTrendsChartProps) {
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
               dataKey="date"
-              tickFormatter={(date) => new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              tickFormatter={(date) => new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}
             />
             <YAxis />
             <Tooltip
-              labelFormatter={(date) => new Date(date).toLocaleDateString()}
+              labelFormatter={(date) => new Date(date).toLocaleDateString('en-US', { timeZone: 'UTC' })}
               formatter={(value) => [`$${Number(value).toFixed(2)}`, 'Revenue']}
             />
             <Line
@@ -142,11 +142,11 @@ export function SalesTrendsChart({ dateRange }: SalesTrendsChartProps) {
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis
                 dataKey="date"
-                tickFormatter={(date) => new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                tickFormatter={(date) => new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}
               />
               <YAxis />
               <Tooltip
-                labelFormatter={(date) => new Date(date).toLocaleDateString()}
+                labelFormatter={(date) => new Date(date).toLocaleDateString('en-US', { timeZone: 'UTC' })}
                 formatter={(value) => `$${Number(value).toFixed(2)}`}
               />
               <Legend />

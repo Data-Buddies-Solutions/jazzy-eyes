@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { calculateReturnCreditSummaries, type CreditLedgerEvent } from '@/lib/analytics/return-credits';
 
 export async function GET(request: NextRequest) {
   try {
@@ -154,6 +155,183 @@ export async function GET(request: NextRequest) {
       }))
       .sort((a, b) => b.revenue - a.revenue);
 
+    // ---- Returns + credit ledger ----
+    const returnsInMonth = await prisma.inventoryTransaction.findMany({
+      where: {
+        transactionType: 'WRITE_OFF',
+        writeOffReason: 'return',
+        transactionDate: { gte: startDate, lte: endDate },
+      },
+      include: {
+        product: {
+          include: {
+            brand: { select: { brandName: true, costDiscountPercent: true, costDiscountStartDate: true } },
+            transactions: {
+              where: { transactionType: { in: ['ORDER', 'RESTOCK'] } },
+              orderBy: { transactionDate: 'desc' },
+              take: 1,
+            },
+          },
+        },
+      },
+    });
+
+    type ReturnRow = {
+      brandName: string;
+      styleNumber: string;
+      colorCode: string;
+      eyeSize: string;
+      date: Date;
+      quantity: number;
+      creditPerUnit: number;
+      creditValue: number;
+    };
+    const returnRows: ReturnRow[] = [];
+    const returnsByBrand: Record<string, { units: number; creditValue: number }> = {};
+    for (const r of returnsInMonth) {
+      const orderTx = r.product.transactions[0];
+      let unitCost = orderTx ? Number(orderTx.unitCost) : 0;
+      const brand = r.product.brand;
+      if (
+        unitCost > 0 &&
+        brand.costDiscountPercent &&
+        Number(brand.costDiscountPercent) > 0 &&
+        brand.costDiscountStartDate &&
+        r.transactionDate >= brand.costDiscountStartDate
+      ) {
+        unitCost = unitCost * (1 - Number(brand.costDiscountPercent) / 100);
+      }
+      const creditValue = unitCost * r.quantity;
+      returnRows.push({
+        brandName: brand.brandName,
+        styleNumber: r.product.styleNumber,
+        colorCode: r.product.colorCode,
+        eyeSize: r.product.eyeSize,
+        date: r.transactionDate,
+        quantity: r.quantity,
+        creditPerUnit: unitCost,
+        creditValue,
+      });
+      if (!returnsByBrand[brand.brandName]) {
+        returnsByBrand[brand.brandName] = { units: 0, creditValue: 0 };
+      }
+      returnsByBrand[brand.brandName].units += r.quantity;
+      returnsByBrand[brand.brandName].creditValue += creditValue;
+    }
+
+    // Build full credit ledger across all time. Credits apply against cost of goods sold (COGS).
+    const allInventorySales = await prisma.inventoryTransaction.findMany({
+      where: { transactionType: 'SALE' },
+      include: {
+        product: {
+          include: {
+            brand: { select: { brandName: true, costDiscountPercent: true, costDiscountStartDate: true } },
+            transactions: {
+              where: { transactionType: { in: ['ORDER', 'RESTOCK'] } },
+              orderBy: { transactionDate: 'desc' },
+              take: 1,
+            },
+          },
+        },
+      },
+    });
+    const allRxSales = await prisma.rxSale.findMany({
+      include: { brand: { select: { brandName: true } } },
+    });
+    const allReturns = await prisma.inventoryTransaction.findMany({
+      where: { transactionType: 'WRITE_OFF', writeOffReason: 'return' },
+      include: {
+        product: {
+          include: {
+            brand: { select: { brandName: true, costDiscountPercent: true, costDiscountStartDate: true } },
+            transactions: {
+              where: { transactionType: { in: ['ORDER', 'RESTOCK'] } },
+              orderBy: { transactionDate: 'desc' },
+              take: 1,
+            },
+          },
+        },
+      },
+    });
+    const creditEvents: CreditLedgerEvent[] = [];
+    for (const s of allInventorySales) {
+      let cogs = Number(s.unitCost);
+      if (cogs === 0 && s.product.transactions.length > 0) {
+        cogs = Number(s.product.transactions[0].unitCost);
+        const brand = s.product.brand;
+        if (
+          brand.costDiscountPercent &&
+          Number(brand.costDiscountPercent) > 0 &&
+          brand.costDiscountStartDate &&
+          s.transactionDate >= brand.costDiscountStartDate
+        ) {
+          cogs = cogs * (1 - Number(brand.costDiscountPercent) / 100);
+        }
+      }
+      if (cogs <= 0) continue;
+      creditEvents.push({
+        brandName: s.product.brand.brandName,
+        date: s.transactionDate,
+        type: 'COST',
+        amount: cogs * s.quantity,
+      });
+    }
+    for (const rx of allRxSales) {
+      const cogs = Number(rx.costPrice);
+      if (cogs <= 0) continue;
+      creditEvents.push({
+        brandName: rx.brand.brandName,
+        date: rx.saleDate,
+        type: 'COST',
+        amount: cogs,
+      });
+    }
+    for (const r of allReturns) {
+      const orderTx = r.product.transactions[0];
+      let unitCost = orderTx ? Number(orderTx.unitCost) : 0;
+      const brand = r.product.brand;
+      if (
+        unitCost > 0 &&
+        brand.costDiscountPercent &&
+        Number(brand.costDiscountPercent) > 0 &&
+        brand.costDiscountStartDate &&
+        r.transactionDate >= brand.costDiscountStartDate
+      ) {
+        unitCost = unitCost * (1 - Number(brand.costDiscountPercent) / 100);
+      }
+      creditEvents.push({
+        brandName: brand.brandName,
+        date: r.transactionDate,
+        type: 'RETURN_CREDIT',
+        amount: unitCost * r.quantity,
+      });
+    }
+    const summaries = calculateReturnCreditSummaries(creditEvents, startDate, endDate);
+
+    const returnsBrandSummary = summaries
+      .filter(
+        (s) =>
+          (returnsByBrand[s.brandName]?.units ?? 0) > 0 ||
+          s.returnCredits > 0 ||
+          s.creditsApplied > 0 ||
+          s.endingCreditBalance > 0 ||
+          s.startingCreditBalance > 0
+      )
+      .map((s) => ({
+        brandName: s.brandName,
+        returnedUnits: returnsByBrand[s.brandName]?.units ?? 0,
+        startingCreditBalance: s.startingCreditBalance,
+        creditGenerated: s.returnCredits,
+        creditsApplied: s.creditsApplied,
+        endingCreditBalance: s.endingCreditBalance,
+      }))
+      .sort((a, b) => b.creditGenerated - a.creditGenerated);
+
+    const totalReturnedUnits = returnRows.reduce((sum, r) => sum + r.quantity, 0);
+    const totalCreditGenerated = returnRows.reduce((sum, r) => sum + r.creditValue, 0);
+    const totalCreditsApplied = summaries.reduce((sum, s) => sum + s.creditsApplied, 0);
+    const totalOutstandingCredit = summaries.reduce((sum, s) => sum + s.endingCreditBalance, 0);
+
     return NextResponse.json({
       success: true,
       report: {
@@ -174,8 +352,14 @@ export async function GET(request: NextRequest) {
           totalProfit,
           averageMargin: totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100) : 0,
           averageSalePrice: totalUnits > 0 ? (totalRevenue / totalUnits) : 0,
+          totalReturnedUnits,
+          totalCreditGenerated,
+          totalCreditsApplied,
+          totalOutstandingCredit,
         },
         brandSummary: brandSummaryArray,
+        returnsBrandSummary,
+        returnRows: returnRows.map((r) => ({ ...r, date: r.date.toISOString() })),
         sales: allSales,
       },
     });

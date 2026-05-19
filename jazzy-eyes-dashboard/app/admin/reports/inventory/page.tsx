@@ -22,12 +22,20 @@ interface Frame {
   frameId: string;
   model: string;
   color: string;
-  qty: number;
   frameType: string;
   productType: string;
   status: string;
   statusColorScheme: string;
+  beginningQty: number;
+  added: number;
+  returned: number;
+  sold: number;
+  otherAdjustments: number;
+  endingQty: number;
+  currentQty: number;
   retailPrice: number;
+  costPrice: number;
+  inventoryValue: number;
 }
 
 interface SpecialOrder {
@@ -49,11 +57,17 @@ interface SpecialOrder {
 
 interface ReportData {
   brandName: string;
+  period: { startDate: string; endDate: string };
   summary: {
     totalFrames: number;
-    activeCount: number;
-    soldOutCount: number;
-    discontinuedCount: number;
+    beginningQty: number;
+    added: number;
+    returned: number;
+    sold: number;
+    otherAdjustments: number;
+    endingQty: number;
+    currentQty: number;
+    inventoryValue: number;
     specialOrderCount: number;
   };
   frames: Frame[];
@@ -63,6 +77,8 @@ interface ReportData {
 export default function InventoryReportPage() {
   const [brands, setBrands] = useState<Brand[]>([]);
   const [selectedBrandId, setSelectedBrandId] = useState<string>('');
+  const currentYear = new Date().getFullYear();
+  const [selectedYear, setSelectedYear] = useState<string>(String(currentYear));
   const [report, setReport] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(false);
   const [brandsLoading, setBrandsLoading] = useState(true);
@@ -101,8 +117,11 @@ export default function InventoryReportPage() {
       setLoading(true);
       setError(null);
       try {
+        const yearNum = parseInt(selectedYear);
+        const startDate = new Date(yearNum, 0, 1).toISOString();
+        const endDate = new Date(yearNum, 11, 31, 23, 59, 59).toISOString();
         const response = await fetch(
-          `/api/reports/inventory?brandId=${selectedBrandId}`
+          `/api/reports/inventory?brandId=${selectedBrandId}&startDate=${startDate}&endDate=${endDate}`
         );
         const data = await response.json();
         if (data.success) {
@@ -118,7 +137,7 @@ export default function InventoryReportPage() {
       }
     };
     fetchReport();
-  }, [selectedBrandId, specialOrdersMode]);
+  }, [selectedBrandId, specialOrdersMode, selectedYear]);
 
   // Fetch special orders (all or filtered by brand)
   const fetchSpecialOrders = useCallback(async (brandId?: string) => {
@@ -290,6 +309,16 @@ export default function InventoryReportPage() {
           </div>
 
           <div className="flex items-center gap-3">
+            {!specialOrdersMode && (
+              <Select value={selectedYear} onValueChange={setSelectedYear}>
+                <SelectTrigger className="w-[110px] border-2 border-black">
+                  <SelectValue placeholder="Year" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="2026">2026</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
             <Select
               value={selectedBrandId}
               onValueChange={(val) => setSelectedBrandId(val === 'all' ? '' : val)}
@@ -509,7 +538,7 @@ export default function InventoryReportPage() {
             <div className="report-header text-center border-b-2 border-black pb-4">
               <h1 className="text-2xl font-bold">Jazzy Eyes</h1>
               <h2 className="text-xl font-semibold mt-1">
-                Inventory Report — {report.brandName}
+                Inventory Report — {report.brandName} — {selectedYear}
               </h2>
               <p className="text-sm text-gray-500 mt-1">
                 Generated:{' '}
@@ -523,46 +552,60 @@ export default function InventoryReportPage() {
               </p>
             </div>
 
-            {/* Summary Cards */}
-            <div className="summary-cards grid grid-cols-2 md:grid-cols-5 gap-4">
-              <Card className="p-4 border-2 border-black">
-                <p className="text-sm text-gray-600">Total Frames</p>
-                <p className="text-2xl font-bold">
-                  {report.summary.totalFrames}
-                </p>
-              </Card>
-              <Card className="p-4 border-2 border-black">
-                <p className="text-sm text-gray-600">Active</p>
-                <p className="text-2xl font-bold text-green-600">
-                  {report.summary.activeCount}
-                </p>
-              </Card>
-              <Card className="p-4 border-2 border-black">
-                <p className="text-sm text-gray-600">Sold Out</p>
-                <p className="text-2xl font-bold text-red-600">
-                  {report.summary.soldOutCount}
-                </p>
-              </Card>
-              <Card className="p-4 border-2 border-black">
-                <p className="text-sm text-gray-600">Discontinued</p>
-                <p className="text-2xl font-bold text-yellow-600">
-                  {report.summary.discontinuedCount}
-                </p>
-              </Card>
-              {report.summary.specialOrderCount > 0 && (
-                <Card className="p-4 border-2 border-black">
-                  <p className="text-sm text-gray-600">Special Orders</p>
-                  <p className="text-2xl font-bold text-blue-600">
-                    {report.summary.specialOrderCount}
+            {/* Inventory Flow Summary */}
+            <Card className="print-card p-4 border-2 border-black">
+              <h2 className="text-lg font-bold mb-1">Inventory Flow — {selectedYear}</h2>
+              <p className="text-xs text-gray-500 mb-3">
+                {selectedYear === '2026'
+                  ? 'Beginning = initial inventory seeded on Jan 8, 2026 (system start). Added/Sold/Returned reflect activity after that day.'
+                  : `Beginning = qty on hand at start of ${selectedYear}. Added/Sold/Returned reflect activity during ${selectedYear}.`}
+              </p>
+              <div className="summary-cards grid grid-cols-2 md:grid-cols-5 gap-4">
+                <Card className="p-3 border-2 border-black">
+                  <p className="text-xs text-gray-600">Beginning</p>
+                  <p className="text-2xl font-bold">{report.summary.beginningQty}</p>
+                </Card>
+                <Card className="p-3 border-2 border-black bg-green-50">
+                  <p className="text-xs text-gray-600">+ Added</p>
+                  <p className="text-2xl font-bold text-green-700">{report.summary.added}</p>
+                </Card>
+                <Card className="p-3 border-2 border-black bg-blue-50">
+                  <p className="text-xs text-gray-600">− Returned</p>
+                  <p className="text-2xl font-bold text-blue-700">{report.summary.returned}</p>
+                </Card>
+                <Card className="p-3 border-2 border-black bg-red-50">
+                  <p className="text-xs text-gray-600">− Sold</p>
+                  <p className="text-2xl font-bold text-red-700">{report.summary.sold}</p>
+                </Card>
+                <Card className="p-3 border-2 border-black bg-gray-100">
+                  <p className="text-xs text-gray-600">= Ending</p>
+                  <p className="text-2xl font-bold">{report.summary.endingQty}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    On hand now: {report.summary.currentQty}
                   </p>
                 </Card>
+              </div>
+              {report.summary.otherAdjustments !== 0 && (
+                <p className="text-xs text-gray-500 mt-2">
+                  Note: {report.summary.otherAdjustments} unit(s) lost to damage/defective/other write-offs (net).
+                </p>
               )}
-            </div>
+              {report.summary.specialOrderCount > 0 && (
+                <p className="text-sm text-gray-600 mt-3">
+                  Special orders: {report.summary.specialOrderCount}
+                </p>
+              )}
+            </Card>
 
-            {/* Inventory Table */}
+            {/* Frames Table */}
+            {(() => {
+              const visibleFrames = report.frames.filter(
+                (f) => !(f.currentQty === 0 && f.status === 'Discontinued')
+              );
+              return (
             <Card className="print-card p-4 border-2 border-black">
               <h2 className="text-lg font-bold mb-3">
-                Frames ({report.frames.length})
+                Frames ({visibleFrames.length})
               </h2>
               <div className="overflow-x-auto">
                 <table className="inventory-table w-full text-sm">
@@ -578,42 +621,46 @@ export default function InventoryReportPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {report.frames.map((frame, index) => (
-                      <tr
-                        key={frame.frameId}
-                        className={index % 2 === 0 ? 'bg-gray-50' : ''}
-                      >
-                        <td className="py-1.5 px-1 font-medium">
-                          {frame.frameId}
-                        </td>
-                        <td className="py-1.5 px-1">{frame.model}</td>
-                        <td className="py-1.5 px-1">{frame.color}</td>
-                        <td className="text-center py-1.5 px-1">{frame.qty}</td>
-                        <td className="py-1.5 px-1">
-                          {frame.productType} / {frame.frameType}
-                        </td>
-                        <td className="py-1.5 px-1">
-                          <span
-                            className={`px-1.5 py-0.5 rounded text-xs font-medium ${
-                              frame.status === 'Active'
-                                ? 'bg-green-100 text-green-700'
-                                : frame.status === 'Discontinued'
-                                ? 'bg-yellow-100 text-yellow-700'
-                                : 'bg-red-100 text-red-700'
-                            }`}
-                          >
-                            {frame.status}
-                          </span>
-                        </td>
-                        <td className="text-right py-1.5 px-1">
-                          {formatCurrency(frame.retailPrice)}
-                        </td>
-                      </tr>
-                    ))}
+                    {visibleFrames.map((frame, index) => {
+                      const displayStatus =
+                        frame.status === 'Discontinued'
+                          ? 'Discontinued'
+                          : frame.currentQty === 0
+                          ? 'Sold Out'
+                          : 'Active';
+                      const statusClass =
+                        displayStatus === 'Active'
+                          ? 'bg-green-100 text-green-700'
+                          : displayStatus === 'Sold Out'
+                          ? 'bg-red-100 text-red-700'
+                          : 'bg-gray-100 text-gray-700';
+                      return (
+                        <tr
+                          key={frame.frameId}
+                          className={index % 2 === 0 ? 'bg-gray-50' : ''}
+                        >
+                          <td className="py-1.5 px-1 font-medium">{frame.frameId}</td>
+                          <td className="py-1.5 px-1">{frame.model}</td>
+                          <td className="py-1.5 px-1">{frame.color}</td>
+                          <td className="text-center py-1.5 px-1">{frame.currentQty}</td>
+                          <td className="py-1.5 px-1">
+                            {frame.productType} / {frame.frameType}
+                          </td>
+                          <td className="py-1.5 px-1">
+                            <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${statusClass}`}>
+                              {displayStatus}
+                            </span>
+                          </td>
+                          <td className="text-right py-1.5 px-1">{formatCurrency(frame.retailPrice)}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
             </Card>
+              );
+            })()}
 
             {/* Special Orders in Inventory Mode */}
             {report.specialOrders.length > 0 && (
