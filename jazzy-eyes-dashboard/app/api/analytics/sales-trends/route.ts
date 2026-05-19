@@ -18,6 +18,13 @@ export async function GET(request: NextRequest) {
     const startDate = new Date(startDateStr);
     const endDate = new Date(endDateStr);
 
+    const ET_DATE = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/New_York',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+
     // Get all SALE transactions in date range (inventory sales)
     const saleTransactions = await prisma.inventoryTransaction.findMany({
       where: {
@@ -89,7 +96,7 @@ export async function GET(request: NextRequest) {
 
     // Process inventory transactions
     saleTransactions.forEach((transaction) => {
-      const dateStr = transaction.transactionDate.toISOString().split('T')[0];
+      const dateStr = ET_DATE.format(transaction.transactionDate);
       const brandName = transaction.product.brand.brandName;
       const revenue = Number(transaction.unitPrice);
 
@@ -130,7 +137,7 @@ export async function GET(request: NextRequest) {
 
     // Process RX sales
     rxSales.forEach((rx) => {
-      const dateStr = rx.saleDate.toISOString().split('T')[0];
+      const dateStr = ET_DATE.format(rx.saleDate);
       const brandName = rx.brand.brandName;
       const revenue = Number(rx.salePrice);
 

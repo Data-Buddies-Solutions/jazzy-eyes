@@ -5,6 +5,8 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const brandId = searchParams.get('brandId');
+    const startDateStr = searchParams.get('startDate');
+    const endDateStr = searchParams.get('endDate');
 
     if (!brandId) {
       return NextResponse.json(
@@ -21,7 +23,21 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Fetch brand info
+    const now = new Date();
+    const startDate = startDateStr
+      ? new Date(startDateStr)
+      : new Date(now.getFullYear(), 0, 1);
+    const endDate = endDateStr ? new Date(endDateStr) : now;
+
+    // System inception: 2026-01-08 was the day initial inventory was seeded
+    // (807 ORDER transactions on one day). Anything on/before this counts as
+    // Beginning, not Added — even when looking at the 2026 report.
+    const INCEPTION_DATE = new Date('2026-01-08T23:59:59.999Z');
+    const beginningBoundary =
+      startDate.getTime() > INCEPTION_DATE.getTime()
+        ? new Date(startDate.getTime() - 1)
+        : INCEPTION_DATE;
+
     const brand = await prisma.brand.findUnique({
       where: { id: brandIdNum },
       select: { brandName: true, companyName: true },
@@ -34,62 +50,111 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Fetch all products for this brand
     const products = await prisma.product.findMany({
       where: { brandId: brandIdNum },
       include: {
-        brand: {
-          select: { brandName: true },
-        },
-        status: {
-          select: { id: true, name: true, colorScheme: true },
-        },
-        transactions: {
-          where: { transactionType: 'ORDER' },
-          orderBy: { transactionDate: 'desc' },
-          take: 1,
-        },
+        status: { select: { name: true, colorScheme: true } },
+        transactions: { orderBy: { transactionDate: 'asc' } },
       },
       orderBy: { compositeId: 'asc' },
     });
 
-    // Transform products to frames
-    const frames = products.map((product) => {
-      const orderTransaction = product.transactions[0];
-      const retailPrice = orderTransaction
-        ? Number(orderTransaction.unitPrice)
-        : 0;
+    // Per-frame flow computation
+    const frames = products.map((p) => {
+      let beginningQty = 0;
+      let added = 0;
+      let returned = 0;
+      let sold = 0;
+      let otherAdjustments = 0; // damaged/lost/defective write-offs + reverts
 
-      const dbStatus = product.status?.name || 'Active';
-      const statusName =
-        product.currentQty === 0 && dbStatus !== 'Discontinued'
-          ? 'Sold Out'
-          : dbStatus;
+      for (const t of p.transactions) {
+        const beforeWindow = t.transactionDate <= beginningBoundary;
+        const inWindow = !beforeWindow && t.transactionDate <= endDate;
+
+        // Signed delta from each transaction type
+        let delta = 0;
+        let bucket: 'added' | 'returned' | 'sold' | 'other' = 'other';
+        switch (t.transactionType) {
+          case 'ORDER':
+          case 'RESTOCK':
+            delta = t.quantity;
+            bucket = 'added';
+            break;
+          case 'SALE':
+            delta = -t.quantity;
+            bucket = 'sold';
+            break;
+          case 'WRITE_OFF':
+            delta = -t.quantity;
+            bucket = t.writeOffReason === 'return' ? 'returned' : 'other';
+            break;
+          case 'REVERT_WRITE_OFF':
+            delta = t.quantity;
+            bucket = 'other';
+            break;
+        }
+
+        if (beforeWindow) {
+          beginningQty += delta;
+        } else if (inWindow) {
+          if (bucket === 'added') added += t.quantity;
+          else if (bucket === 'sold') sold += t.quantity;
+          else if (bucket === 'returned') returned += t.quantity;
+          else otherAdjustments += -delta; // positive if subtraction
+        }
+      }
+
+      const endingQty = beginningQty + added - returned - sold - otherAdjustments;
+      const orderTx = p.transactions.find((t) => t.transactionType === 'ORDER');
+      const retailPrice = orderTx ? Number(orderTx.unitPrice) : 0;
+      const costPrice = orderTx ? Number(orderTx.unitCost) : 0;
 
       return {
-        frameId: product.compositeId,
-        model: product.styleNumber,
-        color: product.colorCode,
-        qty: product.currentQty,
-        frameType: product.frameType,
-        productType: product.productType,
-        status: statusName,
-        statusColorScheme: product.status?.colorScheme || 'green',
+        frameId: p.compositeId,
+        model: p.styleNumber,
+        color: p.colorCode,
+        frameType: p.frameType,
+        productType: p.productType,
+        status: p.status?.name || 'Active',
+        statusColorScheme: p.status?.colorScheme || 'green',
+        beginningQty,
+        added,
+        returned,
+        sold,
+        otherAdjustments,
+        endingQty,
+        currentQty: p.currentQty,
         retailPrice,
+        costPrice,
+        inventoryValue: costPrice * p.currentQty,
       };
     });
 
-    // Compute summary stats
-    const totalFrames = frames.length;
-    const activeCount = products.filter(
-      (p) => p.currentQty > 0 && p.status?.name !== 'Discontinued'
-    ).length;
-    const soldOutCount = products.filter((p) => p.currentQty === 0).length;
-    const discontinuedCount = products.filter(
-      (p) => p.status?.name === 'Discontinued'
-    ).length;
+    // Brand-level rollup
+    const summary = frames.reduce(
+      (acc, f) => ({
+        beginningQty: acc.beginningQty + f.beginningQty,
+        added: acc.added + f.added,
+        returned: acc.returned + f.returned,
+        sold: acc.sold + f.sold,
+        otherAdjustments: acc.otherAdjustments + f.otherAdjustments,
+        endingQty: acc.endingQty + f.endingQty,
+        currentQty: acc.currentQty + f.currentQty,
+        inventoryValue: acc.inventoryValue + f.inventoryValue,
+      }),
+      {
+        beginningQty: 0,
+        added: 0,
+        returned: 0,
+        sold: 0,
+        otherAdjustments: 0,
+        endingQty: 0,
+        currentQty: 0,
+        inventoryValue: 0,
+      }
+    );
 
-    // Fetch special orders for this brand
+    // Special orders (preserved for backwards compat with the page)
     const specialOrders = await prisma.inventoryTransaction.findMany({
       where: {
         isSpecialOrder: true,
@@ -128,11 +193,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       brandName: brand.brandName,
+      period: { startDate: startDate.toISOString(), endDate: endDate.toISOString() },
       summary: {
-        totalFrames,
-        activeCount,
-        soldOutCount,
-        discontinuedCount,
+        ...summary,
+        totalFrames: frames.length,
         specialOrderCount: specialOrderItems.length,
       },
       frames,

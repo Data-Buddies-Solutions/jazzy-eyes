@@ -1,15 +1,20 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Loader2, DollarSign, TrendingUp } from 'lucide-react';
-import { MetricCard } from './MetricCard';
+import { Loader2 } from 'lucide-react';
 import type { DateRange, MarginsResponse } from '@/types/analytics';
 import { toISODateString } from '@/lib/utils/date-utils';
 
 interface MarginsChartProps {
   dateRange: DateRange;
 }
+
+const fmtMoney = (n: number) =>
+  `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+// Treat "Sun" and "Sunglasses" as the same category.
+const normalizeProductType = (t: string) =>
+  t.toLowerCase().startsWith('sun') ? 'Sun' : t;
 
 export function MarginsChart({ dateRange }: MarginsChartProps) {
   const [data, setData] = useState<MarginsResponse | null>(null);
@@ -20,21 +25,15 @@ export function MarginsChart({ dateRange }: MarginsChartProps) {
     const fetchData = async () => {
       setIsLoading(true);
       setError(null);
-
       try {
         const params = new URLSearchParams({
           startDate: toISODateString(dateRange.startDate),
           endDate: toISODateString(dateRange.endDate),
         });
-
         const response = await fetch(`/api/analytics/margins?${params}`);
         const result = await response.json();
-
-        if (result.success) {
-          setData(result);
-        } else {
-          setError(result.error || 'Failed to fetch data');
-        }
+        if (result.success) setData(result);
+        else setError(result.error || 'Failed to fetch data');
       } catch (err) {
         setError('Failed to fetch margins data');
         console.error(err);
@@ -42,14 +41,13 @@ export function MarginsChart({ dateRange }: MarginsChartProps) {
         setIsLoading(false);
       }
     };
-
     fetchData();
   }, [dateRange]);
 
   if (isLoading) {
     return (
       <div className="bg-white border-2 border-black rounded-lg p-6">
-        <h2 className="text-2xl font-bold mb-4">Margin Analysis</h2>
+        <h2 className="text-2xl font-bold mb-4">Returns & Vendor Credits</h2>
         <div className="flex items-center justify-center h-64">
           <Loader2 className="w-8 h-8 animate-spin text-sky-deeper" />
         </div>
@@ -60,79 +58,171 @@ export function MarginsChart({ dateRange }: MarginsChartProps) {
   if (error || !data) {
     return (
       <div className="bg-white border-2 border-black rounded-lg p-6">
-        <h2 className="text-2xl font-bold mb-4">Margin Analysis</h2>
+        <h2 className="text-2xl font-bold mb-4">Returns & Vendor Credits</h2>
         <div className="text-center text-red-600 py-8">{error || 'No data available'}</div>
       </div>
     );
   }
 
+  const rows = data.byBrand
+    .filter(
+      (b) =>
+        b.totalRevenue > 0 ||
+        b.startingCreditBalance > 0 ||
+        b.returnCredits > 0 ||
+        b.creditsApplied > 0 ||
+        b.endingCreditBalance > 0
+    )
+    .map((b) => ({
+      brandName: b.brandName,
+      revenue: b.totalRevenue,
+      cost: b.totalCost,
+      startingBalance: b.startingCreditBalance,
+      generated: b.returnCredits,
+      applied: b.creditsApplied,
+      netCost: b.netCost,
+      adjustedProfit: b.adjustedProfit,
+      marginPercent: b.totalRevenue > 0 ? (b.adjustedProfit / b.totalRevenue) * 100 : 0,
+      carryForward: b.endingCreditBalance,
+    }))
+    .sort((a, b) => b.revenue - a.revenue);
+
+  const totals = rows.reduce(
+    (acc, r) => ({
+      revenue: acc.revenue + r.revenue,
+      cost: acc.cost + r.cost,
+      startingBalance: acc.startingBalance + r.startingBalance,
+      generated: acc.generated + r.generated,
+      applied: acc.applied + r.applied,
+      netCost: acc.netCost + r.netCost,
+      adjustedProfit: acc.adjustedProfit + r.adjustedProfit,
+      carryForward: acc.carryForward + r.carryForward,
+    }),
+    { revenue: 0, cost: 0, startingBalance: 0, generated: 0, applied: 0, netCost: 0, adjustedProfit: 0, carryForward: 0 }
+  );
+  const totalMargin = totals.revenue > 0 ? (totals.adjustedProfit / totals.revenue) * 100 : 0;
+
+  // Merge Sun + Sunglasses into a single product type
+  const mergedProductTypes = new Map<string, { revenue: number; profit: number }>();
+  for (const p of data.byProductType) {
+    const key = normalizeProductType(p.productType);
+    const prev = mergedProductTypes.get(key) ?? { revenue: 0, profit: 0 };
+    mergedProductTypes.set(key, {
+      revenue: prev.revenue + p.revenue,
+      profit: prev.profit + p.profit,
+    });
+  }
+  const productTypes = Array.from(mergedProductTypes.entries()).map(([productType, d]) => ({
+    productType,
+    revenue: d.revenue,
+    profit: d.profit,
+    marginPercent: d.revenue > 0 ? (d.profit / d.revenue) * 100 : 0,
+  }));
+
   return (
     <div className="bg-white border-2 border-black rounded-lg p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold">Margin Analysis</h2>
-        <p className="text-sm text-gray-600">Profitability by brand</p>
-      </div>
+      <h2 className="text-2xl font-bold mb-4">Returns & Vendor Credits</h2>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <MetricCard
-          title="Total Revenue"
-          value={`$${data.overall.totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
-          icon={<DollarSign className="w-5 h-5" />}
-        />
-        <MetricCard
-          title="Total Profit"
-          value={`$${data.overall.totalProfit.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
-          icon={<TrendingUp className="w-5 h-5" />}
-        />
-        <MetricCard
-          title="Avg Margin"
-          value={`${data.overall.avgMargin.toFixed(1)}%`}
-        />
-        <MetricCard
-          title="Best Margin"
-          value={data.overall.bestMarginBrand}
-          subtitle="Top performer"
-          className="border-green-500"
-        />
-      </div>
+      {rows.length === 0 ? (
+        <p className="text-gray-500 py-6 text-center">No sales or vendor credits in this period.</p>
+      ) : (
+        <>
+          <p className="text-sm text-gray-600 mb-4">
+            Sales per brand with vendor credit applied to reduce net cost. Each row balances:{' '}
+            <span className="font-medium">Starting + Generated = Applied + Carry</span>.
+          </p>
 
-      {/* By Brand Chart */}
-      <div className="mb-6">
-        <h3 className="text-lg font-semibold mb-4">Margins by Brand</h3>
-        <ResponsiveContainer width="100%" height={Math.max(300, data.byBrand.length * 45)}>
-          <BarChart data={data.byBrand} layout="vertical" margin={{ left: 90, right: 30 }}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis type="number" />
-            <YAxis dataKey="brandName" type="category" width={85} />
-            <Tooltip
-              formatter={(value) => `$${Number(value).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
-            />
-            <Legend />
-            <Bar dataKey="totalRevenue" fill="#87CEEB" name="Revenue" />
-            <Bar dataKey="totalCost" fill="#EF4444" name="Cost" />
-            <Bar dataKey="grossProfit" fill="#10B981" name="Profit" />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+            <div className="border-2 border-black rounded p-3 bg-green-50">
+              <p className="text-xs text-gray-600">Revenue</p>
+              <p className="text-2xl font-bold text-green-700">{fmtMoney(totals.revenue)}</p>
+            </div>
+            <div className="border-2 border-black rounded p-3 bg-red-50">
+              <p className="text-xs text-gray-600">Cost</p>
+              <p className="text-2xl font-bold text-red-700">{fmtMoney(totals.cost)}</p>
+            </div>
+            <div className="border-2 border-black rounded p-3 bg-blue-50">
+              <p className="text-xs text-gray-600">Credits applied</p>
+              <p className="text-2xl font-bold text-blue-700">{fmtMoney(totals.applied)}</p>
+            </div>
+            <div className="border-2 border-black rounded p-3 bg-amber-50">
+              <p className="text-xs text-gray-600">Carry to next month</p>
+              <p className="text-2xl font-bold text-amber-700">{fmtMoney(totals.carryForward)}</p>
+            </div>
+          </div>
 
-      {/* Product Type Comparison */}
-      {data.byProductType.length > 0 && (
-        <div>
-          <h3 className="text-lg font-semibold mb-4">Optical vs Sun</h3>
+          <div className="overflow-x-auto border-2 border-black rounded">
+            <table className="w-full text-sm">
+              <thead className="bg-sky-soft/30 border-b-2 border-black">
+                <tr>
+                  <th className="text-left p-2 font-semibold">Brand</th>
+                  <th className="text-right p-2 font-semibold">Revenue</th>
+                  <th className="text-right p-2 font-semibold">Cost</th>
+                  <th className="text-right p-2 font-semibold" title="Credit carried in from prior periods">
+                    Starting balance
+                  </th>
+                  <th className="text-right p-2 font-semibold">Generated</th>
+                  <th className="text-right p-2 font-semibold">Credits applied</th>
+                  <th className="text-right p-2 font-semibold">Net cost</th>
+                  <th className="text-right p-2 font-semibold">Margin</th>
+                  <th className="text-right p-2 font-semibold">Carry to next month</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.brandName} className="border-b last:border-b-0">
+                    <td className="p-2 font-medium">{r.brandName}</td>
+                    <td className="p-2 text-right">{fmtMoney(r.revenue)}</td>
+                    <td className="p-2 text-right">{fmtMoney(r.cost)}</td>
+                    <td className="p-2 text-right text-gray-700">
+                      {r.startingBalance > 0 ? fmtMoney(r.startingBalance) : '—'}
+                    </td>
+                    <td className="p-2 text-right text-blue-700">
+                      {r.generated > 0 ? fmtMoney(r.generated) : '—'}
+                    </td>
+                    <td className="p-2 text-right text-green-700">
+                      {r.applied > 0 ? `−${fmtMoney(r.applied)}` : '—'}
+                    </td>
+                    <td className="p-2 text-right">{fmtMoney(r.netCost)}</td>
+                    <td className="p-2 text-right">
+                      {r.revenue > 0 ? `${r.marginPercent.toFixed(1)}%` : '—'}
+                    </td>
+                    <td className="p-2 text-right font-semibold text-amber-700">
+                      {r.carryForward > 0 ? fmtMoney(r.carryForward) : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="border-t-2 border-black bg-sky-soft/20 font-semibold">
+                <tr>
+                  <td className="p-2">Total</td>
+                  <td className="p-2 text-right">{fmtMoney(totals.revenue)}</td>
+                  <td className="p-2 text-right">{fmtMoney(totals.cost)}</td>
+                  <td className="p-2 text-right">{fmtMoney(totals.startingBalance)}</td>
+                  <td className="p-2 text-right text-blue-700">{fmtMoney(totals.generated)}</td>
+                  <td className="p-2 text-right text-green-700">−{fmtMoney(totals.applied)}</td>
+                  <td className="p-2 text-right">{fmtMoney(totals.netCost)}</td>
+                  <td className="p-2 text-right">{totalMargin.toFixed(1)}%</td>
+                  <td className="p-2 text-right text-amber-700">{fmtMoney(totals.carryForward)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </>
+      )}
+
+      {productTypes.length > 0 && (
+        <div className="mt-6">
+          <h3 className="text-lg font-semibold mb-3">Margin by product type</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {data.byProductType.map((type) => (
+            {productTypes.map((type) => (
               <div key={type.productType} className="border-2 border-black rounded p-4">
                 <p className="text-lg font-semibold">{type.productType}</p>
                 <p className="text-2xl font-bold text-sky-deeper mt-2">
                   {type.marginPercent.toFixed(1)}%
                 </p>
-                <p className="text-sm text-gray-600 mt-1">
-                  ${type.revenue.toLocaleString('en-US', { minimumFractionDigits: 2 })} revenue
-                </p>
-                <p className="text-sm text-gray-600">
-                  ${type.profit.toLocaleString('en-US', { minimumFractionDigits: 2 })} profit
-                </p>
+                <p className="text-sm text-gray-600 mt-1">{fmtMoney(type.revenue)} revenue</p>
+                <p className="text-sm text-gray-600">{fmtMoney(type.profit)} profit</p>
               </div>
             ))}
           </div>
