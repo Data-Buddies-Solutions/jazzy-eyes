@@ -54,31 +54,24 @@ export async function GET(request: NextRequest) {
       if (statusFilter === 'Sold Out') {
         // Sold Out = quantity 0 AND not discontinued (discontinued+empty is hidden)
         where.currentQty = 0;
-        where.status = {
-          OR: [{ name: { not: 'Discontinued' } }, { name: null }],
-        };
+        where.NOT = { status: { name: 'Discontinued' } };
       } else if (statusFilter === 'Active') {
         where.currentQty = { gt: 0 };
-        where.status = {
-          name: { not: 'Discontinued' },
-        };
+        where.NOT = { status: { name: 'Discontinued' } };
       } else if (statusFilter === 'Discontinued') {
         // Discontinued = discontinued AND still has qty (empty discontinued is hidden)
         where.currentQty = { gt: 0 };
-        where.status = {
-          name: 'Discontinued',
-        };
+        where.status = { name: 'Discontinued' };
       }
     } else {
       // Default "All" view: hide frames that are discontinued AND fully sold/returned.
-      // Equivalent to: qty > 0 OR status is null OR status.name != 'Discontinued'.
+      // Equivalent to: qty > 0 OR status.name != 'Discontinued'.
       where.AND = [
         ...(Array.isArray(where.AND) ? where.AND : []),
         {
           OR: [
             { currentQty: { gt: 0 } },
-            { statusId: null },
-            { status: { name: { not: 'Discontinued' } } },
+            { NOT: { status: { name: 'Discontinued' } } },
           ],
         },
       ];
