@@ -54,6 +54,29 @@ export function FrameTable({
     setHistoryModalOpen(true);
   };
 
+  const getStatusBadge = (frame: Frame) => {
+    const displayStatus =
+      frame.displayStatus ||
+      (frame.status === 'Discontinued'
+        ? 'Discontinued'
+        : frame.currentQty === 0
+        ? 'Sold Out'
+        : 'Active');
+
+    const statusClasses = {
+      Active: 'bg-green-100 text-green-800 border-green-300',
+      'Sold Out': 'bg-red-100 text-red-800 border-red-300',
+      Discontinued: 'bg-gray-100 text-gray-800 border-gray-300',
+      Returned: 'bg-blue-100 text-blue-800 border-blue-300',
+    }[displayStatus];
+
+    return (
+      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium border ${statusClasses}`}>
+        {displayStatus}
+      </span>
+    );
+  };
+
   if (frames.length === 0) {
     return (
       <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg">
@@ -100,19 +123,7 @@ export function FrameTable({
                 </TableCell>
                 <TableCell>{frame.frameType}</TableCell>
                 <TableCell>
-                  {frame.status === 'Discontinued' ? (
-                    <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-300">
-                      Discontinued
-                    </span>
-                  ) : frame.currentQty === 0 ? (
-                    <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-300">
-                      Sold Out
-                    </span>
-                  ) : (
-                    <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-300">
-                      Active
-                    </span>
-                  )}
+                  {getStatusBadge(frame)}
                 </TableCell>
                 <TableCell className="text-right font-semibold">
                   ${frame.retailPrice.toFixed(2)}

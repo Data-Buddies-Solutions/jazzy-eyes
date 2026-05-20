@@ -46,16 +46,16 @@ export default function AnalyticsPage() {
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <MetricCard
+          title="Current Inventory"
+          value={kpis ? kpis.currentInventory.toLocaleString() : '—'}
+          subtitle="On hand minus discontinued in stock"
+          icon={<Glasses className="w-5 h-5" />}
+        />
+        <MetricCard
           title="Total Inventory Value"
           value={kpis ? fmtMoney(kpis.totalInventoryValue) : '—'}
           subtitle="Cost basis, qty × unit cost"
           icon={<DollarSign className="w-5 h-5" />}
-        />
-        <MetricCard
-          title="Glasses On Hand"
-          value={kpis ? kpis.totalQtyOnHand.toLocaleString() : '—'}
-          subtitle="Units across all active frames"
-          icon={<Glasses className="w-5 h-5" />}
         />
         <MetricCard
           title="Returns This Period"
