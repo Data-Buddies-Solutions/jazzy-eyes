@@ -1,6 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+type ProductWithRelations = Awaited<
+  ReturnType<typeof prisma.product.findMany>
+>[number] & {
+  status: { id: number; name: string; colorScheme: string } | null;
+  transactions: Array<{
+    transactionType: string;
+    writeOffReason: string | null;
+  }>;
+};
+
+function getDisplayStatus(product: ProductWithRelations) {
+  if (product.currentQty === 0) {
+    const depletionTransaction = product.transactions.find(
+      (t) => t.transactionType === 'SALE' || t.transactionType === 'WRITE_OFF'
+    );
+
+    if (
+      depletionTransaction?.transactionType === 'WRITE_OFF' &&
+      depletionTransaction.writeOffReason === 'return'
+    ) {
+      return 'Returned';
+    }
+
+    if (depletionTransaction?.transactionType === 'SALE') {
+      return 'Sold Out';
+    }
+  }
+
+  if (product.status?.name === 'Discontinued') {
+    return 'Discontinued';
+  }
+
+  if (product.currentQty === 0) {
+    return 'Sold Out';
+  }
+
+  return 'Active';
+}
+
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
@@ -49,38 +88,9 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Add status filter to where clause if specified
-    if (statusFilter && statusFilter !== 'All') {
-      if (statusFilter === 'Sold Out') {
-        // Sold Out = quantity 0 AND not discontinued (discontinued+empty is hidden)
-        where.currentQty = 0;
-        where.NOT = { status: { name: 'Discontinued' } };
-      } else if (statusFilter === 'Active') {
-        where.currentQty = { gt: 0 };
-        where.NOT = { status: { name: 'Discontinued' } };
-      } else if (statusFilter === 'Discontinued') {
-        // Discontinued = discontinued AND still has qty (empty discontinued is hidden)
-        where.currentQty = { gt: 0 };
-        where.status = { name: 'Discontinued' };
-      }
-    } else {
-      // Default "All" view: hide frames that are discontinued AND fully sold/returned.
-      // Equivalent to: qty > 0 OR status.name != 'Discontinued'.
-      where.AND = [
-        ...(Array.isArray(where.AND) ? where.AND : []),
-        {
-          OR: [
-            { currentQty: { gt: 0 } },
-            { NOT: { status: { name: 'Discontinued' } } },
-          ],
-        },
-      ];
-    }
-
-    // Get total count for pagination
-    const totalCount = await prisma.product.count({ where });
-
-    // Fetch products with their status and transactions (paginated)
+    // Fetch products with their status and transactions. Status filtering is
+    // applied after deriving labels from transaction history so returned
+    // discontinued frames stay visible instead of being hidden by qty/status.
     const products = await prisma.product.findMany({
       where,
       include: {
@@ -102,13 +112,12 @@ export async function GET(request: NextRequest) {
         },
       },
       orderBy: { compositeId: 'asc' },
-      skip,
-      take: limit,
     });
 
     // Transform to Frame format using database status
     const frames = products
       .map((product) => {
+        const displayStatus = getDisplayStatus(product);
         // Get sale info if exists
         const saleTransaction = product.transactions.find(
           (t) => t.transactionType === 'SALE'
@@ -141,6 +150,7 @@ export async function GET(request: NextRequest) {
           costPrice,
           retailPrice,
           status: product.status?.name || 'Active',
+          displayStatus,
           statusId: product.status?.id,
           statusColorScheme: product.status?.colorScheme || 'green',
           dateAdded: product.createdAt.toISOString(),
@@ -152,13 +162,16 @@ export async function GET(request: NextRequest) {
           currentQty: product.currentQty,
           isSpecialOrder: orderTransaction?.isSpecialOrder ?? false,
         };
-      });
+      })
+      .filter((frame) => statusFilter === 'All' || frame.displayStatus === statusFilter);
 
+    const totalCount = frames.length;
     const totalPages = Math.ceil(totalCount / limit);
+    const paginatedFrames = frames.slice(skip, skip + limit);
 
     return NextResponse.json({
       success: true,
-      frames,
+      frames: paginatedFrames,
       pagination: {
         page,
         limit,

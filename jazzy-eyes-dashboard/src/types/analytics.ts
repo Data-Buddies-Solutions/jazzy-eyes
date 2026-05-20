@@ -48,6 +48,8 @@ export interface KpisResponse {
   success: boolean;
   totalInventoryValue: number;
   totalQtyOnHand: number;
+  currentInventory: number;
+  discontinuedInStock: number;
   returnsCount: number;
   returnsCreditValue: number;
   outstandingCreditBalance: number;

@@ -17,6 +17,7 @@ export interface Frame {
   costPrice: number;
   retailPrice: number;
   status: string;
+  displayStatus?: 'Active' | 'Sold Out' | 'Discontinued' | 'Returned';
   statusId?: number;
   statusColorScheme?: string;
   dateAdded: string;
@@ -96,7 +97,7 @@ export interface InventoryTransactionRecord {
 
 export interface SearchFilters {
   query: string;
-  status: 'All' | 'Active' | 'Sold' | 'Discontinued';
+  status: 'All' | 'Active' | 'Sold Out' | 'Discontinued' | 'Returned';
 }
 
 // Brand Management Types

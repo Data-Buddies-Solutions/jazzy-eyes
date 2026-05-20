@@ -13,6 +13,17 @@ interface SalesTrendsChartProps {
 
 const BRAND_COLORS = ['#87CEEB', '#F59E0B', '#10B981', '#EF4444', '#A855F7', '#3B82F6', '#EC4899'];
 
+function formatDateOnly(date: string, options?: Intl.DateTimeFormatOptions) {
+  if (date === 'N/A') return date;
+
+  const [year, month, day] = date.split('-').map(Number);
+  if (!year || !month || !day) return date;
+
+  return new Intl.DateTimeFormat('en-US', { ...options, timeZone: 'UTC' }).format(
+    new Date(Date.UTC(year, month - 1, day))
+  );
+}
+
 export function SalesTrendsChart({ dateRange }: SalesTrendsChartProps) {
   const [data, setData] = useState<SalesTrendsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -95,7 +106,7 @@ export function SalesTrendsChart({ dateRange }: SalesTrendsChartProps) {
         <MetricCard
           title="Best Day"
           value={`$${data.summary.bestDay.revenue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
-          subtitle={new Date(data.summary.bestDay.date).toLocaleDateString('en-US', { timeZone: 'UTC' })}
+          subtitle={formatDateOnly(data.summary.bestDay.date)}
           icon={<Calendar className="w-5 h-5" />}
           className="border-green-500"
         />
@@ -114,11 +125,11 @@ export function SalesTrendsChart({ dateRange }: SalesTrendsChartProps) {
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
               dataKey="date"
-              tickFormatter={(date) => new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}
+              tickFormatter={(date) => formatDateOnly(date, { month: 'short', day: 'numeric' })}
             />
             <YAxis />
             <Tooltip
-              labelFormatter={(date) => new Date(date).toLocaleDateString('en-US', { timeZone: 'UTC' })}
+              labelFormatter={(date) => formatDateOnly(String(date))}
               formatter={(value) => [`$${Number(value).toFixed(2)}`, 'Revenue']}
             />
             <Line
@@ -142,11 +153,11 @@ export function SalesTrendsChart({ dateRange }: SalesTrendsChartProps) {
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis
                 dataKey="date"
-                tickFormatter={(date) => new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}
+                tickFormatter={(date) => formatDateOnly(date, { month: 'short', day: 'numeric' })}
               />
               <YAxis />
               <Tooltip
-                labelFormatter={(date) => new Date(date).toLocaleDateString('en-US', { timeZone: 'UTC' })}
+                labelFormatter={(date) => formatDateOnly(String(date))}
                 formatter={(value) => `$${Number(value).toFixed(2)}`}
               />
               <Legend />

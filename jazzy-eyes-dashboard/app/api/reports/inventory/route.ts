@@ -1,6 +1,44 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+type InventoryTransactionForStatus = {
+  transactionType: string;
+  writeOffReason: string | null;
+};
+
+function getDisplayStatus(
+  currentQty: number,
+  statusName: string | undefined,
+  transactions: InventoryTransactionForStatus[]
+) {
+  if (currentQty === 0) {
+    const depletionTransaction = [...transactions]
+      .reverse()
+      .find((t) => t.transactionType === 'SALE' || t.transactionType === 'WRITE_OFF');
+
+    if (
+      depletionTransaction?.transactionType === 'WRITE_OFF' &&
+      depletionTransaction.writeOffReason === 'return'
+    ) {
+      return 'Returned';
+    }
+
+    if (depletionTransaction?.transactionType === 'SALE') {
+      return 'Sold Out';
+    }
+  }
+
+  if (statusName === 'Discontinued') {
+    return 'Discontinued';
+  }
+
+  if (currentQty === 0) {
+    return 'Sold Out';
+  }
+
+  return 'Active';
+}
+
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
@@ -108,6 +146,8 @@ export async function GET(request: NextRequest) {
       const orderTx = p.transactions.find((t) => t.transactionType === 'ORDER');
       const retailPrice = orderTx ? Number(orderTx.unitPrice) : 0;
       const costPrice = orderTx ? Number(orderTx.unitCost) : 0;
+      const displayStatus = getDisplayStatus(p.currentQty, p.status?.name, p.transactions);
+      const discontinuedInStockQty = displayStatus === 'Discontinued' ? p.currentQty : 0;
 
       return {
         frameId: p.compositeId,
@@ -116,10 +156,13 @@ export async function GET(request: NextRequest) {
         frameType: p.frameType,
         productType: p.productType,
         status: p.status?.name || 'Active',
+        displayStatus,
         statusColorScheme: p.status?.colorScheme || 'green',
         beginningQty,
         added,
         returned,
+        returnedOrDiscontinued: returned + discontinuedInStockQty,
+        discontinuedInStockQty,
         sold,
         otherAdjustments,
         endingQty,
@@ -135,21 +178,29 @@ export async function GET(request: NextRequest) {
       (acc, f) => ({
         beginningQty: acc.beginningQty + f.beginningQty,
         added: acc.added + f.added,
+        ongoingInventory: acc.ongoingInventory + f.beginningQty + f.added,
         returned: acc.returned + f.returned,
+        returnedOrDiscontinued: acc.returnedOrDiscontinued + f.returnedOrDiscontinued,
+        discontinuedInStockQty: acc.discontinuedInStockQty + f.discontinuedInStockQty,
         sold: acc.sold + f.sold,
         otherAdjustments: acc.otherAdjustments + f.otherAdjustments,
         endingQty: acc.endingQty + f.endingQty,
         currentQty: acc.currentQty + f.currentQty,
+        currentInventory: acc.currentInventory + f.currentQty - f.discontinuedInStockQty,
         inventoryValue: acc.inventoryValue + f.inventoryValue,
       }),
       {
         beginningQty: 0,
         added: 0,
+        ongoingInventory: 0,
         returned: 0,
+        returnedOrDiscontinued: 0,
+        discontinuedInStockQty: 0,
         sold: 0,
         otherAdjustments: 0,
         endingQty: 0,
         currentQty: 0,
+        currentInventory: 0,
         inventoryValue: 0,
       }
     );

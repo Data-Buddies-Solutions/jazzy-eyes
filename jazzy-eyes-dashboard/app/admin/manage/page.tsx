@@ -23,7 +23,7 @@ interface Pagination {
   totalPages: number;
 }
 
-type StatusFilter = 'All' | 'Active' | 'Sold Out' | 'Discontinued';
+type StatusFilter = 'All' | 'Active' | 'Sold Out' | 'Discontinued' | 'Returned';
 
 type SearchMode = 'brand' | 'color';
 
@@ -217,7 +217,7 @@ export default function ManageInventoryPage() {
           {/* Status Filter */}
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-600 mr-2">Status:</span>
-            {(['All', 'Active', 'Sold Out', 'Discontinued'] as StatusFilter[]).map((status) => (
+            {(['All', 'Active', 'Sold Out', 'Discontinued', 'Returned'] as StatusFilter[]).map((status) => (
               <Button
                 key={status}
                 type="button"
@@ -232,6 +232,8 @@ export default function ManageInventoryPage() {
                       ? 'bg-red-600 hover:bg-red-700 text-white border-2 border-red-700'
                       : status === 'Discontinued'
                       ? 'bg-gray-600 hover:bg-gray-700 text-white border-2 border-gray-700'
+                      : status === 'Returned'
+                      ? 'bg-blue-600 hover:bg-blue-700 text-white border-2 border-blue-700'
                       : 'bg-sky-deeper hover:bg-sky-deeper/90 text-black border-2 border-black'
                     : 'border-2 border-gray-300 hover:border-black'
                 }

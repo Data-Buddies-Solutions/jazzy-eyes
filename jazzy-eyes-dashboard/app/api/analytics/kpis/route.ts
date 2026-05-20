@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
     const products = await prisma.product.findMany({
       where: { currentQty: { gt: 0 } },
       include: {
+        status: { select: { name: true } },
         brand: { select: { brandName: true, costDiscountPercent: true, costDiscountStartDate: true } },
         transactions: {
           where: { transactionType: { in: ['ORDER', 'RESTOCK'] } },
@@ -34,6 +35,7 @@ export async function GET(request: NextRequest) {
 
     let totalInventoryValue = 0;
     let totalQtyOnHand = 0;
+    let discontinuedInStock = 0;
     for (const p of products) {
       const orderTx = p.transactions[0];
       let unitCost = orderTx ? Number(orderTx.unitCost) : 0;
@@ -48,7 +50,11 @@ export async function GET(request: NextRequest) {
       }
       totalInventoryValue += unitCost * p.currentQty;
       totalQtyOnHand += p.currentQty;
+      if (p.status?.name === 'Discontinued') {
+        discontinuedInStock += p.currentQty;
+      }
     }
+    const currentInventory = totalQtyOnHand - discontinuedInStock;
 
     // Returns in window: WRITE_OFF rows with reason='return' in date range.
     // Credit value per row = quantity * product's most-recent ORDER cost (with brand discount).
@@ -191,6 +197,8 @@ export async function GET(request: NextRequest) {
       success: true,
       totalInventoryValue,
       totalQtyOnHand,
+      currentInventory,
+      discontinuedInStock,
       returnsCount,
       returnsCreditValue,
       outstandingCreditBalance,

@@ -25,10 +25,13 @@ interface Frame {
   frameType: string;
   productType: string;
   status: string;
+  displayStatus: 'Active' | 'Sold Out' | 'Discontinued' | 'Returned';
   statusColorScheme: string;
   beginningQty: number;
   added: number;
   returned: number;
+  returnedOrDiscontinued: number;
+  discontinuedInStockQty: number;
   sold: number;
   otherAdjustments: number;
   endingQty: number;
@@ -62,11 +65,15 @@ interface ReportData {
     totalFrames: number;
     beginningQty: number;
     added: number;
+    ongoingInventory: number;
     returned: number;
+    returnedOrDiscontinued: number;
+    discontinuedInStockQty: number;
     sold: number;
     otherAdjustments: number;
     endingQty: number;
     currentQty: number;
+    currentInventory: number;
     inventoryValue: number;
     specialOrderCount: number;
   };
@@ -557,32 +564,28 @@ export default function InventoryReportPage() {
               <h2 className="text-lg font-bold mb-1">Inventory Flow — {selectedYear}</h2>
               <p className="text-xs text-gray-500 mb-3">
                 {selectedYear === '2026'
-                  ? 'Beginning = initial inventory seeded on Jan 8, 2026 (system start). Added/Sold/Returned reflect activity after that day.'
-                  : `Beginning = qty on hand at start of ${selectedYear}. Added/Sold/Returned reflect activity during ${selectedYear}.`}
+                  ? 'Ongoing Inventory = initial inventory seeded on Jan 8, 2026 plus all reorders after that day.'
+                  : `Ongoing Inventory = qty on hand at start of ${selectedYear} plus reorders during ${selectedYear}.`}
               </p>
-              <div className="summary-cards grid grid-cols-2 md:grid-cols-5 gap-4">
+              <div className="summary-cards grid grid-cols-2 md:grid-cols-4 gap-4">
                 <Card className="p-3 border-2 border-black">
-                  <p className="text-xs text-gray-600">Beginning</p>
-                  <p className="text-2xl font-bold">{report.summary.beginningQty}</p>
-                </Card>
-                <Card className="p-3 border-2 border-black bg-green-50">
-                  <p className="text-xs text-gray-600">+ Added</p>
-                  <p className="text-2xl font-bold text-green-700">{report.summary.added}</p>
+                  <p className="text-xs text-gray-600">Ongoing Inventory</p>
+                  <p className="text-2xl font-bold">{report.summary.ongoingInventory}</p>
                 </Card>
                 <Card className="p-3 border-2 border-black bg-blue-50">
-                  <p className="text-xs text-gray-600">− Returned</p>
-                  <p className="text-2xl font-bold text-blue-700">{report.summary.returned}</p>
+                  <p className="text-xs text-gray-600">Returns / Disco's</p>
+                  <p className="text-2xl font-bold text-blue-700">{report.summary.returnedOrDiscontinued}</p>
+                  <p className="text-xs font-semibold text-blue-700 mt-1">
+                    Returns {report.summary.returned} / Disco's {report.summary.discontinuedInStockQty}
+                  </p>
                 </Card>
                 <Card className="p-3 border-2 border-black bg-red-50">
-                  <p className="text-xs text-gray-600">− Sold</p>
+                  <p className="text-xs text-gray-600">Units Sold</p>
                   <p className="text-2xl font-bold text-red-700">{report.summary.sold}</p>
                 </Card>
-                <Card className="p-3 border-2 border-black bg-gray-100">
-                  <p className="text-xs text-gray-600">= Ending</p>
-                  <p className="text-2xl font-bold">{report.summary.endingQty}</p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    On hand now: {report.summary.currentQty}
-                  </p>
+                <Card className="p-3 border-2 border-black bg-green-50">
+                  <p className="text-xs text-gray-600">Current Inventory</p>
+                  <p className="text-2xl font-bold text-green-700">{report.summary.currentInventory}</p>
                 </Card>
               </div>
               {report.summary.otherAdjustments !== 0 && (
@@ -598,14 +601,9 @@ export default function InventoryReportPage() {
             </Card>
 
             {/* Frames Table */}
-            {(() => {
-              const visibleFrames = report.frames.filter(
-                (f) => !(f.currentQty === 0 && f.status === 'Discontinued')
-              );
-              return (
             <Card className="print-card p-4 border-2 border-black">
               <h2 className="text-lg font-bold mb-3">
-                Frames ({visibleFrames.length})
+                Frames ({report.frames.length})
               </h2>
               <div className="overflow-x-auto">
                 <table className="inventory-table w-full text-sm">
@@ -621,18 +619,15 @@ export default function InventoryReportPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {visibleFrames.map((frame, index) => {
-                      const displayStatus =
-                        frame.status === 'Discontinued'
-                          ? 'Discontinued'
-                          : frame.currentQty === 0
-                          ? 'Sold Out'
-                          : 'Active';
+                    {report.frames.map((frame, index) => {
+                      const displayStatus = frame.displayStatus;
                       const statusClass =
                         displayStatus === 'Active'
                           ? 'bg-green-100 text-green-700'
                           : displayStatus === 'Sold Out'
                           ? 'bg-red-100 text-red-700'
+                          : displayStatus === 'Returned'
+                          ? 'bg-blue-100 text-blue-700'
                           : 'bg-gray-100 text-gray-700';
                       return (
                         <tr
@@ -659,8 +654,6 @@ export default function InventoryReportPage() {
                 </table>
               </div>
             </Card>
-              );
-            })()}
 
             {/* Special Orders in Inventory Mode */}
             {report.specialOrders.length > 0 && (
