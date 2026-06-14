@@ -47,7 +47,7 @@ export function MarginsChart({ dateRange }: MarginsChartProps) {
   if (isLoading) {
     return (
       <div className="bg-white border-2 border-black rounded-lg p-6">
-        <h2 className="text-2xl font-bold mb-4">Returns & Vendor Credits</h2>
+        <h2 className="text-2xl font-bold mb-4">Margins & Vendor Credits</h2>
         <div className="flex items-center justify-center h-64">
           <Loader2 className="w-8 h-8 animate-spin text-sky-deeper" />
         </div>
@@ -58,7 +58,7 @@ export function MarginsChart({ dateRange }: MarginsChartProps) {
   if (error || !data) {
     return (
       <div className="bg-white border-2 border-black rounded-lg p-6">
-        <h2 className="text-2xl font-bold mb-4">Returns & Vendor Credits</h2>
+        <h2 className="text-2xl font-bold mb-4">Margins & Vendor Credits</h2>
         <div className="text-center text-red-600 py-8">{error || 'No data available'}</div>
       </div>
     );
@@ -68,22 +68,14 @@ export function MarginsChart({ dateRange }: MarginsChartProps) {
     .filter(
       (b) =>
         b.totalRevenue > 0 ||
-        b.startingCreditBalance > 0 ||
-        b.returnCredits > 0 ||
-        b.creditsApplied > 0 ||
-        b.endingCreditBalance > 0
+        b.returnCredits > 0
     )
     .map((b) => ({
       brandName: b.brandName,
       revenue: b.totalRevenue,
       cost: b.totalCost,
-      startingBalance: b.startingCreditBalance,
       generated: b.returnCredits,
-      applied: b.creditsApplied,
-      netCost: b.netCost,
-      adjustedProfit: b.adjustedProfit,
-      marginPercent: b.totalRevenue > 0 ? (b.adjustedProfit / b.totalRevenue) * 100 : 0,
-      carryForward: b.endingCreditBalance,
+      marginPercent: b.marginPercent,
     }))
     .sort((a, b) => b.revenue - a.revenue);
 
@@ -91,16 +83,12 @@ export function MarginsChart({ dateRange }: MarginsChartProps) {
     (acc, r) => ({
       revenue: acc.revenue + r.revenue,
       cost: acc.cost + r.cost,
-      startingBalance: acc.startingBalance + r.startingBalance,
       generated: acc.generated + r.generated,
-      applied: acc.applied + r.applied,
-      netCost: acc.netCost + r.netCost,
-      adjustedProfit: acc.adjustedProfit + r.adjustedProfit,
-      carryForward: acc.carryForward + r.carryForward,
+      grossProfit: acc.grossProfit + (r.revenue - r.cost),
     }),
-    { revenue: 0, cost: 0, startingBalance: 0, generated: 0, applied: 0, netCost: 0, adjustedProfit: 0, carryForward: 0 }
+    { revenue: 0, cost: 0, generated: 0, grossProfit: 0 }
   );
-  const totalMargin = totals.revenue > 0 ? (totals.adjustedProfit / totals.revenue) * 100 : 0;
+  const totalMargin = totals.revenue > 0 ? (totals.grossProfit / totals.revenue) * 100 : 0;
 
   // Merge Sun + Sunglasses into a single product type
   const mergedProductTypes = new Map<string, { revenue: number; profit: number }>();
@@ -121,18 +109,17 @@ export function MarginsChart({ dateRange }: MarginsChartProps) {
 
   return (
     <div className="bg-white border-2 border-black rounded-lg p-6">
-      <h2 className="text-2xl font-bold mb-4">Returns & Vendor Credits</h2>
+      <h2 className="text-2xl font-bold mb-4">Margins & Vendor Credits</h2>
 
       {rows.length === 0 ? (
         <p className="text-gray-500 py-6 text-center">No sales or vendor credits in this period.</p>
       ) : (
         <>
           <p className="text-sm text-gray-600 mb-4">
-            Sales per brand with vendor credit applied to reduce net cost. Each row balances:{' '}
-            <span className="font-medium">Starting + Generated = Applied + Carry</span>.
+            Use the EOM report for credit balances.
           </p>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
             <div className="border-2 border-black rounded p-3 bg-green-50">
               <p className="text-xs text-gray-600">Revenue</p>
               <p className="text-2xl font-bold text-green-700">{fmtMoney(totals.revenue)}</p>
@@ -142,12 +129,8 @@ export function MarginsChart({ dateRange }: MarginsChartProps) {
               <p className="text-2xl font-bold text-red-700">{fmtMoney(totals.cost)}</p>
             </div>
             <div className="border-2 border-black rounded p-3 bg-blue-50">
-              <p className="text-xs text-gray-600">Credits applied</p>
-              <p className="text-2xl font-bold text-blue-700">{fmtMoney(totals.applied)}</p>
-            </div>
-            <div className="border-2 border-black rounded p-3 bg-amber-50">
-              <p className="text-xs text-gray-600">Carry to next month</p>
-              <p className="text-2xl font-bold text-amber-700">{fmtMoney(totals.carryForward)}</p>
+              <p className="text-xs text-gray-600">Credits generated</p>
+              <p className="text-2xl font-bold text-blue-700">{fmtMoney(totals.generated)}</p>
             </div>
           </div>
 
@@ -158,14 +141,8 @@ export function MarginsChart({ dateRange }: MarginsChartProps) {
                   <th className="text-left p-2 font-semibold">Brand</th>
                   <th className="text-right p-2 font-semibold">Revenue</th>
                   <th className="text-right p-2 font-semibold">Cost</th>
-                  <th className="text-right p-2 font-semibold" title="Credit carried in from prior periods">
-                    Starting balance
-                  </th>
-                  <th className="text-right p-2 font-semibold">Generated</th>
-                  <th className="text-right p-2 font-semibold">Credits applied</th>
-                  <th className="text-right p-2 font-semibold">Net cost</th>
                   <th className="text-right p-2 font-semibold">Margin</th>
-                  <th className="text-right p-2 font-semibold">Carry to next month</th>
+                  <th className="text-right p-2 font-semibold">Credits generated</th>
                 </tr>
               </thead>
               <tbody>
@@ -174,21 +151,11 @@ export function MarginsChart({ dateRange }: MarginsChartProps) {
                     <td className="p-2 font-medium">{r.brandName}</td>
                     <td className="p-2 text-right">{fmtMoney(r.revenue)}</td>
                     <td className="p-2 text-right">{fmtMoney(r.cost)}</td>
-                    <td className="p-2 text-right text-gray-700">
-                      {r.startingBalance > 0 ? fmtMoney(r.startingBalance) : '—'}
-                    </td>
-                    <td className="p-2 text-right text-blue-700">
-                      {r.generated > 0 ? fmtMoney(r.generated) : '—'}
-                    </td>
-                    <td className="p-2 text-right text-green-700">
-                      {r.applied > 0 ? `−${fmtMoney(r.applied)}` : '—'}
-                    </td>
-                    <td className="p-2 text-right">{fmtMoney(r.netCost)}</td>
                     <td className="p-2 text-right">
                       {r.revenue > 0 ? `${r.marginPercent.toFixed(1)}%` : '—'}
                     </td>
-                    <td className="p-2 text-right font-semibold text-amber-700">
-                      {r.carryForward > 0 ? fmtMoney(r.carryForward) : '—'}
+                    <td className="p-2 text-right text-blue-700">
+                      {r.generated > 0 ? fmtMoney(r.generated) : '—'}
                     </td>
                   </tr>
                 ))}
@@ -198,12 +165,8 @@ export function MarginsChart({ dateRange }: MarginsChartProps) {
                   <td className="p-2">Total</td>
                   <td className="p-2 text-right">{fmtMoney(totals.revenue)}</td>
                   <td className="p-2 text-right">{fmtMoney(totals.cost)}</td>
-                  <td className="p-2 text-right">{fmtMoney(totals.startingBalance)}</td>
-                  <td className="p-2 text-right text-blue-700">{fmtMoney(totals.generated)}</td>
-                  <td className="p-2 text-right text-green-700">−{fmtMoney(totals.applied)}</td>
-                  <td className="p-2 text-right">{fmtMoney(totals.netCost)}</td>
                   <td className="p-2 text-right">{totalMargin.toFixed(1)}%</td>
-                  <td className="p-2 text-right text-amber-700">{fmtMoney(totals.carryForward)}</td>
+                  <td className="p-2 text-right text-blue-700">{fmtMoney(totals.generated)}</td>
                 </tr>
               </tfoot>
             </table>

@@ -12,6 +12,8 @@ interface SalesTrendsChartProps {
 }
 
 const BRAND_COLORS = ['#87CEEB', '#F59E0B', '#10B981', '#EF4444', '#A855F7', '#3B82F6', '#EC4899'];
+const CHART_MARGIN = { top: 8, right: 24, left: 18, bottom: 8 };
+const Y_AXIS_WIDTH = 76;
 
 function formatDateOnly(date: string, options?: Intl.DateTimeFormatOptions) {
   if (date === 'N/A') return date;
@@ -22,6 +24,13 @@ function formatDateOnly(date: string, options?: Intl.DateTimeFormatOptions) {
   return new Intl.DateTimeFormat('en-US', { ...options, timeZone: 'UTC' }).format(
     new Date(Date.UTC(year, month - 1, day))
   );
+}
+
+function formatCurrencyTick(value: number) {
+  return `$${new Intl.NumberFormat('en-US', {
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(value)}`;
 }
 
 export function SalesTrendsChart({ dateRange }: SalesTrendsChartProps) {
@@ -121,13 +130,18 @@ export function SalesTrendsChart({ dateRange }: SalesTrendsChartProps) {
       <div className="mb-6">
         <h3 className="text-lg font-semibold mb-4">Overall Revenue Trend</h3>
         <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={data.dailySales}>
+          <LineChart data={data.dailySales} margin={CHART_MARGIN}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
               dataKey="date"
               tickFormatter={(date) => formatDateOnly(date, { month: 'short', day: 'numeric' })}
+              tickMargin={8}
             />
-            <YAxis />
+            <YAxis
+              width={Y_AXIS_WIDTH}
+              tickFormatter={(value) => formatCurrencyTick(Number(value))}
+              tickMargin={8}
+            />
             <Tooltip
               labelFormatter={(date) => formatDateOnly(String(date))}
               formatter={(value) => [`$${Number(value).toFixed(2)}`, 'Revenue']}
@@ -149,13 +163,18 @@ export function SalesTrendsChart({ dateRange }: SalesTrendsChartProps) {
         <div>
           <h3 className="text-lg font-semibold mb-4">Revenue by Brand</h3>
           <ResponsiveContainer width="100%" height={300}>
-            <AreaChart data={brandTrendData}>
+            <AreaChart data={brandTrendData} margin={CHART_MARGIN}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis
                 dataKey="date"
                 tickFormatter={(date) => formatDateOnly(date, { month: 'short', day: 'numeric' })}
+                tickMargin={8}
               />
-              <YAxis />
+              <YAxis
+                width={Y_AXIS_WIDTH}
+                tickFormatter={(value) => formatCurrencyTick(Number(value))}
+                tickMargin={8}
+              />
               <Tooltip
                 labelFormatter={(date) => formatDateOnly(String(date))}
                 formatter={(value) => `$${Number(value).toFixed(2)}`}
