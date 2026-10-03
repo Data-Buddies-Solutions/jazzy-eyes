@@ -26,7 +26,6 @@ export default function BrandsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  // Modal states
   const [addCompanyModalOpen, setAddCompanyModalOpen] = useState(false);
   const [editCompanyModalOpen, setEditCompanyModalOpen] = useState(false);
   const [addBrandModalOpen, setAddBrandModalOpen] = useState(false);
@@ -34,7 +33,6 @@ export default function BrandsPage() {
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [deleteConfirmModalOpen, setDeleteConfirmModalOpen] = useState(false);
 
-  // Selected data
   const [selectedCompany, setSelectedCompany] = useState<{
     id: number;
     name: string;
@@ -43,16 +41,12 @@ export default function BrandsPage() {
   const [pendingUpdate, setPendingUpdate] = useState<any>(null);
   const [confirmMessage, setConfirmMessage] = useState('');
 
-  // Saving states
   const [isSaving, setIsSaving] = useState(false);
 
-  // Key to force form reset
   const [brandFormKey, setBrandFormKey] = useState(0);
 
-  // Track which accordion is open
   const [openAccordion, setOpenAccordion] = useState<string | undefined>(undefined);
 
-  // Load brands
   const loadBrands = async () => {
     try {
       setIsLoading(true);
@@ -77,7 +71,6 @@ export default function BrandsPage() {
     loadBrands();
   }, []);
 
-  // Filter companies by search query
   const filteredCompanies = useMemo(() => {
     if (!searchQuery) return companies;
 
@@ -96,7 +89,6 @@ export default function BrandsPage() {
       );
   }, [companies, searchQuery]);
 
-  // Handle create company
   const handleCreateCompany = async (data: CreateCompanyData) => {
     setIsSaving(true);
     setError(null);
@@ -111,10 +103,9 @@ export default function BrandsPage() {
 
       if (result.success) {
         setAddCompanyModalOpen(false);
-        // Automatically open the Add Brand modal for the new company
         setSelectedCompany({ id: result.companyId, name: data.companyName });
         setAddBrandModalOpen(true);
-        setBrandFormKey((prev) => prev + 1); // Reset the form
+        setBrandFormKey((prev) => prev + 1);
         toast.success(`Company "${data.companyName}" created with ID: ${result.companyId}. Now add your first brand.`);
       } else {
         setError(result.error || 'Failed to create company');
@@ -127,7 +118,6 @@ export default function BrandsPage() {
     }
   };
 
-  // Handle edit company
   const handleEditCompany = (companyId: number, companyName: string) => {
     setSelectedCompany({ id: companyId, name: companyName });
     setEditCompanyModalOpen(true);
@@ -163,11 +153,9 @@ export default function BrandsPage() {
     }
   };
 
-  // Handle add brand
   const handleAddBrand = (companyId: number, companyName: string) => {
     setSelectedCompany({ id: companyId, name: companyName });
     setAddBrandModalOpen(true);
-    // Keep the accordion open for this company
     setOpenAccordion(companyId.toString());
   };
 
@@ -203,7 +191,6 @@ export default function BrandsPage() {
     }
   };
 
-  // Handle edit brand
   const handleEditBrand = (brand: BrandWithDetails) => {
     setSelectedBrand(brand);
     setEditBrandModalOpen(true);
@@ -224,7 +211,6 @@ export default function BrandsPage() {
       const result = await response.json();
 
       if (!result.success && result.requiresConfirmation) {
-        // Show confirmation modal
         setPendingUpdate({ ...data, confirmed: true });
         setConfirmMessage(result.message);
         setConfirmModalOpen(true);
@@ -248,7 +234,6 @@ export default function BrandsPage() {
     }
   };
 
-  // Handle confirmed update
   const handleConfirmedUpdate = async () => {
     if (!selectedBrand || !pendingUpdate) return;
 
@@ -281,9 +266,7 @@ export default function BrandsPage() {
     }
   };
 
-  // Handle delete brand
   const handleDeleteBrand = (brand: BrandWithDetails) => {
-    // Check if brand has products
     if (brand.productCount > 0) {
       setError(
         `Cannot delete "${brand.brandName}" - it has ${brand.productCount} product(s) associated with it. Please remove all products first or edit the brand instead.`
@@ -291,7 +274,6 @@ export default function BrandsPage() {
       return;
     }
 
-    // Set selected brand and show confirmation modal
     setSelectedBrand(brand);
     setConfirmMessage(
       `Are you sure you want to delete "${brand.brandName}" (ID: ${brand.id})? This action cannot be undone.`
@@ -299,7 +281,6 @@ export default function BrandsPage() {
     setDeleteConfirmModalOpen(true);
   };
 
-  // Handle confirmed delete
   const handleConfirmedDelete = async () => {
     if (!selectedBrand) return;
 
@@ -329,7 +310,6 @@ export default function BrandsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex justify-between items-start">
         <div>
           <h1 className="text-3xl font-bold mb-2">Manage Brands</h1>
@@ -346,7 +326,6 @@ export default function BrandsPage() {
         </Button>
       </div>
 
-      {/* Error Alert */}
       {error && (
         <Alert className="border-2 border-red-500 bg-red-50">
           <AlertCircle className="h-4 w-4 text-red-600" />
@@ -354,7 +333,6 @@ export default function BrandsPage() {
         </Alert>
       )}
 
-      {/* Search Bar */}
       <div className="bg-white border-2 border-black rounded-lg p-6">
         <Input
           placeholder="Search companies or brands..."
@@ -369,7 +347,6 @@ export default function BrandsPage() {
         )}
       </div>
 
-      {/* Brand Accordion */}
       {isLoading ? (
         <div className="flex justify-center items-center py-12">
           <Loader2 className="w-8 h-8 animate-spin text-sky-deeper" />
@@ -386,7 +363,6 @@ export default function BrandsPage() {
         />
       )}
 
-      {/* Add Company Modal */}
       <Dialog open={addCompanyModalOpen} onOpenChange={setAddCompanyModalOpen}>
         <DialogContent className="border-2 border-black">
           <DialogTitle>Add New Company</DialogTitle>
@@ -398,7 +374,6 @@ export default function BrandsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Company Modal */}
       <Dialog open={editCompanyModalOpen} onOpenChange={setEditCompanyModalOpen}>
         <DialogContent className="border-2 border-black">
           <DialogTitle>Edit Company</DialogTitle>
@@ -411,7 +386,6 @@ export default function BrandsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Add Brand Modal */}
       <Dialog open={addBrandModalOpen} onOpenChange={setAddBrandModalOpen}>
         <DialogContent className="border-2 border-black">
           <DialogTitle>Add New Brand to {selectedCompany?.name}</DialogTitle>
@@ -427,7 +401,6 @@ export default function BrandsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Brand Modal */}
       <Dialog open={editBrandModalOpen} onOpenChange={setEditBrandModalOpen}>
         <DialogContent className="border-2 border-black">
           <DialogTitle>Edit Brand</DialogTitle>
@@ -447,7 +420,6 @@ export default function BrandsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Confirmation Modal - Brand Update */}
       <ConfirmationModal
         open={confirmModalOpen}
         onOpenChange={setConfirmModalOpen}
@@ -457,7 +429,6 @@ export default function BrandsPage() {
         isLoading={isSaving}
       />
 
-      {/* Confirmation Modal - Brand Delete */}
       <ConfirmationModal
         open={deleteConfirmModalOpen}
         onOpenChange={setDeleteConfirmModalOpen}

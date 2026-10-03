@@ -24,8 +24,6 @@ export async function GET(request: NextRequest) {
     if (!brands.length) return NextResponse.json({ success: false, error: 'Company or brand not found.' }, { status: 404 });
     const asOf = new Date().toISOString().slice(0, 10);
     const startDate = start.toISOString().slice(0, 10), endDate = end.toISOString().slice(0, 10);
-    // One batched product/history fetch for the selected brands. Complete history is
-    // necessary for FIFO age; filtering transactions to the activity period is wrong.
     const products = await prisma.product.findMany({
       where: { brandId: { in: brands.map(brand => brand.id) } },
       select: {

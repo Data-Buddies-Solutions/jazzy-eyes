@@ -23,7 +23,6 @@ import {
 } from '@/components/ui/table';
 import type { Frame, InventoryTransactionRecord } from '@/types/admin';
 import { Loader2, History, RotateCcw, ShoppingCart, Package, AlertTriangle, Truck } from 'lucide-react';
-// Note: RotateCcw kept for REVERT_WRITE_OFF transaction type display
 
 interface TransactionHistoryModalProps {
   open: boolean;
@@ -86,7 +85,6 @@ export function TransactionHistoryModal({
   }, [open, frame.frameId]);
 
   const formatDate = (dateString: string) => {
-    // Parse as UTC to avoid timezone shifts
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
       year: 'numeric',
@@ -109,7 +107,6 @@ export function TransactionHistoryModal({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Frame Details */}
         <Card className="p-4 border-2 border-black bg-sky-soft/20">
           <div className="flex flex-wrap gap-4">
             <div>
@@ -131,7 +128,6 @@ export function TransactionHistoryModal({
           </div>
         </Card>
 
-        {/* Transactions Table */}
         <div className="overflow-y-auto max-h-[400px] border-2 border-black rounded-lg">
           {isLoading ? (
             <div className="flex justify-center items-center py-12">
@@ -161,7 +157,6 @@ export function TransactionHistoryModal({
                   };
                   const Icon = config.icon;
 
-                  // Determine what amount to show based on transaction type
                   const getAmountDisplay = () => {
                     switch (transaction.transactionType) {
                       case 'SALE':

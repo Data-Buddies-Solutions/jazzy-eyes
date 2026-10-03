@@ -1,8 +1,5 @@
 import { PrismaClient } from '@prisma/client';
 
-// Merge the duplicate Luxottica company (companyId 14000) into the canonical one (companyId 6000).
-// All brands under 14000 get repointed to 6000, then the 14000 row is implicitly gone
-// (companies aren't a separate table — companyId/companyName live on the Brand row).
 const SOURCE_COMPANY_ID = 14000;
 const TARGET_COMPANY_ID = 6000;
 

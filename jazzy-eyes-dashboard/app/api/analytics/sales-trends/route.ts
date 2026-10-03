@@ -18,8 +18,6 @@ export async function GET(request: NextRequest) {
     const startDate = new Date(startDateStr);
     const endDate = new Date(endDateStr);
 
-    // These are DATE columns, not timestamps. Prisma returns them as UTC
-    // midnight, so formatting in America/New_York shifts them to the prior day.
     const DATE_ONLY = new Intl.DateTimeFormat('en-CA', {
       timeZone: 'UTC',
       year: 'numeric',
@@ -27,7 +25,6 @@ export async function GET(request: NextRequest) {
       day: '2-digit',
     });
 
-    // Get all SALE transactions in date range (inventory sales)
     const saleTransactions = await prisma.inventoryTransaction.findMany({
       where: {
         transactionType: 'SALE',
@@ -52,7 +49,6 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Get all RX sales in date range
     const rxSales = await prisma.rxSale.findMany({
       where: {
         saleDate: {
@@ -72,7 +68,6 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Group by date
     const dailySalesMap = new Map<
       string,
       {
@@ -84,7 +79,6 @@ export async function GET(request: NextRequest) {
       }
     >();
 
-    // Group by brand and date for trends
     const brandTrendsMap = new Map<
       string,
       Map<
@@ -96,13 +90,11 @@ export async function GET(request: NextRequest) {
       >
     >();
 
-    // Process inventory transactions
     saleTransactions.forEach((transaction) => {
       const dateStr = DATE_ONLY.format(transaction.transactionDate);
       const brandName = transaction.product.brand.brandName;
       const revenue = Number(transaction.unitPrice);
 
-      // Daily sales
       if (!dailySalesMap.has(dateStr)) {
         dailySalesMap.set(dateStr, {
           unitsSold: 0,
@@ -119,7 +111,6 @@ export async function GET(request: NextRequest) {
       dailyData.revenue += revenue;
       dailyData.totalPrice += revenue;
 
-      // Brand trends
       if (!brandTrendsMap.has(brandName)) {
         brandTrendsMap.set(brandName, new Map());
       }
@@ -137,13 +128,11 @@ export async function GET(request: NextRequest) {
       brandDateData.revenue += revenue;
     });
 
-    // Process RX sales
     rxSales.forEach((rx) => {
       const dateStr = DATE_ONLY.format(rx.saleDate);
       const brandName = rx.brand.brandName;
       const revenue = Number(rx.salePrice);
 
-      // Daily sales
       if (!dailySalesMap.has(dateStr)) {
         dailySalesMap.set(dateStr, {
           unitsSold: 0,
@@ -160,7 +149,6 @@ export async function GET(request: NextRequest) {
       dailyData.revenue += revenue;
       dailyData.totalPrice += revenue;
 
-      // Brand trends
       if (!brandTrendsMap.has(brandName)) {
         brandTrendsMap.set(brandName, new Map());
       }
@@ -178,7 +166,6 @@ export async function GET(request: NextRequest) {
       brandDateData.revenue += revenue;
     });
 
-    // Format daily sales
     const dailySales = Array.from(dailySalesMap.entries())
       .map(([date, data]) => ({
         date,
@@ -188,7 +175,6 @@ export async function GET(request: NextRequest) {
       }))
       .sort((a, b) => a.date.localeCompare(b.date));
 
-    // Format brand trends
     const brandTrends = Array.from(brandTrendsMap.entries()).map(
       ([brandName, dateMap]) => {
         const data = Array.from(dateMap.entries())
@@ -209,10 +195,8 @@ export async function GET(request: NextRequest) {
       }
     );
 
-    // Sort brand trends by total revenue descending
     brandTrends.sort((a, b) => b.totalRevenue - a.totalRevenue);
 
-    // Calculate summary
     const totalDays = dailySales.length;
     const totalRevenue = dailySales.reduce((sum, d) => sum + d.revenue, 0);
     const avgDailyRevenue = totalDays > 0 ? totalRevenue / totalDays : 0;

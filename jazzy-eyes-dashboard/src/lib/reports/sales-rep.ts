@@ -1,4 +1,3 @@
-// Receipt dates are recorded as database DATE values. Use calendar days throughout.
 const DAY = 86_400_000;
 const INCEPTION = '2026-01-08';
 export type RepTransaction = {
@@ -50,7 +49,6 @@ export function buildRepRow(product: RepProduct, brand: string, start: string, e
     const inPeriod = date >= start && date <= end;
     if (t.transactionType === 'ORDER' || t.transactionType === 'RESTOCK') {
       lastReceived = date;
-      // Initial inventory is an opening balance, not a new arrival.
       if (inPeriod && date > INCEPTION) received += t.quantity;
       lots.push({ date, quantity: t.quantity });
     } else if (t.transactionType === 'SALE' || t.transactionType === 'WRITE_OFF') {
@@ -70,7 +68,6 @@ export function buildRepRow(product: RepProduct, brand: string, start: string, e
       if (remaining > 0) { consumed.push({ date: null, quantity: remaining }); uncertain = true; }
       if (t.transactionType === 'WRITE_OFF') removed.set(t.id, consumed);
     } else if (t.transactionType === 'REVERT_WRITE_OFF') {
-      // A correction restores the original receipt age, not the correction date.
       const original = t.revertedFromId === null ? [] : (removed.get(t.revertedFromId) ?? []);
       let remaining = t.quantity;
       for (const lot of original) {

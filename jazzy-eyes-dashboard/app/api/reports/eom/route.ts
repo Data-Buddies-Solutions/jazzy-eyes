@@ -15,11 +15,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Calculate date range for the month
     const startDate = new Date(year, month - 1, 1);
-    const endDate = new Date(year, month, 0, 23, 59, 59, 999); // Last day of month
+    const endDate = new Date(year, month, 0, 23, 59, 59, 999);
 
-    // Fetch inventory sales (SALE transactions)
     const inventorySales = await prisma.inventoryTransaction.findMany({
       where: {
         transactionType: 'SALE',
@@ -47,7 +45,6 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Fetch RX sales
     const rxSales = await prisma.rxSale.findMany({
       where: {
         saleDate: {
@@ -63,13 +60,10 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Format inventory sales
     const formattedInventorySales = inventorySales.map((sale) => {
-      // Use SALE transaction cost, or fallback to ORDER transaction cost if SALE cost is 0
       let unitCost = Number(sale.unitCost);
       if (unitCost === 0 && sale.product.transactions.length > 0) {
         unitCost = Number(sale.product.transactions[0].unitCost);
-        // Apply brand discount to fallback cost for sales on/after discount start date
         const brand = sale.product.brand;
         if (
           brand.costDiscountPercent &&
@@ -101,7 +95,6 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    // Format RX sales
     const formattedRxSales = rxSales.map((sale) => ({
       id: sale.id,
       type: 'RX' as const,
@@ -121,12 +114,10 @@ export async function GET(request: NextRequest) {
       profit: Number(sale.salePrice) - Number(sale.costPrice),
     }));
 
-    // Combine and sort by date
     const allSales = [...formattedInventorySales, ...formattedRxSales].sort(
       (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
-    // Calculate summaries
     const totalRevenue = allSales.reduce((sum, sale) => sum + sale.totalRevenue, 0);
     const totalCost = allSales.reduce((sum, sale) => sum + sale.totalCost, 0);
     const totalProfit = totalRevenue - totalCost;
@@ -134,7 +125,6 @@ export async function GET(request: NextRequest) {
     const inventoryUnits = formattedInventorySales.reduce((sum, sale) => sum + sale.quantity, 0);
     const rxUnits = formattedRxSales.length;
 
-    // Summary by brand
     const brandSummary: Record<string, { units: number; revenue: number; cost: number; profit: number }> = {};
     allSales.forEach((sale) => {
       if (!brandSummary[sale.brandName]) {
@@ -146,7 +136,6 @@ export async function GET(request: NextRequest) {
       brandSummary[sale.brandName].profit += sale.profit;
     });
 
-    // Convert to sorted array
     const brandSummaryArray = Object.entries(brandSummary)
       .map(([brandName, data]) => ({
         brandName,
@@ -155,7 +144,6 @@ export async function GET(request: NextRequest) {
       }))
       .sort((a, b) => b.revenue - a.revenue);
 
-    // ---- Returns + credit ledger ----
     const returnsInMonth = await prisma.inventoryTransaction.findMany({
       where: {
         transactionType: 'WRITE_OFF',
@@ -219,7 +207,6 @@ export async function GET(request: NextRequest) {
       returnsByBrand[brand.brandName].creditValue += creditValue;
     }
 
-    // Build full credit ledger across all time. Credits apply against cost of goods sold (COGS).
     const allInventorySales = await prisma.inventoryTransaction.findMany({
       where: { transactionType: 'SALE' },
       include: {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { parsePagination, paginationError } from '@/lib/http/pagination';
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,7 +19,6 @@ export async function POST(request: NextRequest) {
       notes,
     } = body;
 
-    // Validate required fields
     if (!brandId || !styleNumber || !colorCode || !eyeSize || !salePrice) {
       return NextResponse.json(
         { success: false, error: 'Missing required fields' },
@@ -26,7 +26,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify brand exists
     const brand = await prisma.brand.findUnique({
       where: { id: brandId },
     });
@@ -38,7 +37,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create the RX sale record
     const rxSale = await prisma.rxSale.create({
       data: {
         brandId,
@@ -87,9 +85,11 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '20');
-    const skip = (page - 1) * limit;
+    const pagination = parsePagination(searchParams);
+    if (!pagination) {
+      return NextResponse.json({ success: false, error: paginationError }, { status: 400 });
+    }
+    const { page, limit, skip } = pagination;
 
     const totalCount = await prisma.rxSale.count();
 

@@ -35,13 +35,12 @@ export function RestockModal({
   const [quantity, setQuantity] = useState<number>(1);
   const [costPrice, setCostPrice] = useState<string>(frame.costPrice.toString());
   const [invoiceDate, setInvoiceDate] = useState<string>(
-    new Date().toISOString().split('T')[0] // Format: YYYY-MM-DD
+    new Date().toISOString().split('T')[0]
   );
   const [notes, setNotes] = useState<string>('');
   const [isSpecialOrder, setIsSpecialOrder] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Reset form when frame changes or modal opens
   useEffect(() => {
     if (open) {
       setQuantity(1);
@@ -88,7 +87,6 @@ export function RestockModal({
       if (result.success) {
         toast.success(result.message || `Restocked ${quantity} unit(s) successfully!`);
         onOpenChange(false);
-        // Reset form
         setQuantity(1);
         setCostPrice(frame.costPrice.toString());
         setNotes('');
@@ -123,7 +121,6 @@ export function RestockModal({
           </DialogHeader>
 
           <div className="space-y-6 py-6">
-            {/* Frame Details */}
             <Card className="p-4 border-2 border-black bg-sky-soft/20">
               <div className="space-y-2">
                 <div className="flex justify-between">
@@ -151,7 +148,6 @@ export function RestockModal({
               </div>
             </Card>
 
-            {/* Quantity Selector */}
             <div className="space-y-2">
               <Label>Quantity to Add</Label>
               <div className="flex items-center gap-3">
@@ -191,7 +187,6 @@ export function RestockModal({
               </div>
             </div>
 
-            {/* Cost Price */}
             <div className="space-y-2">
               <Label htmlFor="costPrice">Cost Price per Unit</Label>
               <div className="relative">
@@ -212,7 +207,6 @@ export function RestockModal({
               </p>
             </div>
 
-            {/* Invoice Date */}
             <div className="space-y-2">
               <Label htmlFor="invoiceDate">Invoice Date</Label>
               <Input
@@ -227,7 +221,6 @@ export function RestockModal({
               </p>
             </div>
 
-            {/* Notes */}
             <div className="space-y-2">
               <Label htmlFor="notes">Notes (Optional)</Label>
               <Textarea
@@ -240,7 +233,6 @@ export function RestockModal({
               />
             </div>
 
-            {/* Special Order */}
             <div className="flex items-center space-x-2">
               <Checkbox
                 id="restock-isSpecialOrder"
@@ -256,7 +248,6 @@ export function RestockModal({
               </Label>
             </div>
 
-            {/* Summary */}
             <Card className="p-4 border-2 border-green-300 bg-green-50">
               <div className="space-y-2">
                 <div className="flex justify-between items-center">

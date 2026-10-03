@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { parsePagination, paginationError } from '@/lib/http/pagination';
 
 type ProductWithRelations = Awaited<
   ReturnType<typeof prisma.product.findMany>
@@ -46,23 +47,21 @@ export async function GET(request: NextRequest) {
     const query = searchParams.get('query') || '';
     const statusFilter = searchParams.get('status') || 'All';
     const searchMode = searchParams.get('searchMode') || 'brand';
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '20');
-    const skip = (page - 1) * limit;
+    const pagination = parsePagination(searchParams);
+    if (!pagination) {
+      return NextResponse.json({ success: false, error: paginationError }, { status: 400 });
+    }
+    const { page, limit, skip } = pagination;
 
-    // Build where clause
     const where: any = {};
 
-    // Search based on mode
     if (query) {
       if (searchMode === 'color') {
-        // Search by color code only
         where.colorCode = {
           contains: query,
           mode: 'insensitive',
         };
       } else {
-        // Default: Search by frame ID (composite ID), brand name, or style number
         where.OR = [
           {
             compositeId: {
@@ -88,9 +87,6 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Fetch products with their status and transactions. Status filtering is
-    // applied after deriving labels from transaction history so returned
-    // discontinued frames stay visible instead of being hidden by qty/status.
     const products = await prisma.product.findMany({
       where,
       include: {
@@ -108,17 +104,17 @@ export async function GET(request: NextRequest) {
           },
         },
         transactions: {
+          select: { transactionType: true, writeOffReason: true, unitCost: true, unitPrice: true,
+            invoiceDate: true, notes: true, isSpecialOrder: true, transactionDate: true },
           orderBy: { transactionDate: 'desc' },
         },
       },
       orderBy: { compositeId: 'asc' },
     });
 
-    // Transform to Frame format using database status
     const frames = products
       .map((product) => {
         const displayStatus = getDisplayStatus(product);
-        // Get sale info if exists
         const saleTransaction = product.transactions.find(
           (t) => t.transactionType === 'SALE'
         );

@@ -106,7 +106,7 @@ const MONTHS = [
 
 export default function EOMReportPage() {
   const [year, setYear] = useState(new Date().getFullYear().toString());
-  const [month, setMonth] = useState('1'); // Default to January
+  const [month, setMonth] = useState('1');
   const [report, setReport] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -158,7 +158,6 @@ export default function EOMReportPage() {
 
   return (
     <>
-      {/* Print Styles */}
       <style jsx global>{`
         @media print {
           /* Basic setup */
@@ -271,7 +270,6 @@ export default function EOMReportPage() {
       `}</style>
 
       <div className="space-y-6">
-        {/* Controls - Hidden when printing */}
         <div className="no-print flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -321,7 +319,6 @@ export default function EOMReportPage() {
           </div>
         </div>
 
-        {/* Loading State */}
         {loading && (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin" />
@@ -329,17 +326,14 @@ export default function EOMReportPage() {
           </div>
         )}
 
-        {/* Error State */}
         {error && (
           <Card className="p-6 border-2 border-red-500 bg-red-50">
             <p className="text-red-700">{error}</p>
           </Card>
         )}
 
-        {/* Report Content */}
         {!loading && report && (report.sales.length > 0 || report.returnRows.length > 0) && (
           <div ref={printRef} className="print-area space-y-6">
-            {/* Report Header */}
             <div className="report-header text-center border-b-2 border-black pb-4">
               <h1 className="text-2xl font-bold">Jazzy Eyes</h1>
               <h2 className="text-xl font-semibold mt-1">
@@ -416,7 +410,6 @@ export default function EOMReportPage() {
               );
             })()}
 
-            {/* Brand Summary Table */}
             <div className="brand-section">
               <Card className="print-card p-4 border-2 border-black">
                 <h2 className="text-lg font-bold mb-3">Sales by Brand</h2>
@@ -459,7 +452,6 @@ export default function EOMReportPage() {
             </Card>
             </div>
 
-            {/* Returns Section */}
             {(report.returnRows.length > 0 || report.returnsBrandSummary.length > 0) && (
               <div className="brand-section">
                 <Card className="print-card p-4 border-2 border-black bg-blue-50/30">
@@ -560,7 +552,6 @@ export default function EOMReportPage() {
               </div>
             )}
 
-            {/* Detailed Sales Table */}
             <Card className="print-card p-4 border-2 border-black">
               <h2 className="text-lg font-bold mb-3">Detailed Sales ({report.sales.length} transactions)</h2>
               <div className="overflow-x-auto">
@@ -605,7 +596,6 @@ export default function EOMReportPage() {
                   </tbody>
                 </table>
               </div>
-              {/* Final Totals - only shows once at end */}
               <div className="mt-4 pt-3 border-t-2 border-black flex justify-end">
                 <div className="text-sm font-bold space-x-6">
                   <span>TOTAL: {report.summary.totalUnits} units</span>
@@ -616,14 +606,12 @@ export default function EOMReportPage() {
               </div>
             </Card>
 
-            {/* Footer */}
             <div className="report-footer text-center text-sm text-gray-500 pt-4 border-t">
               <p>Jazzy Eyes - End of Month Report - {report.period.monthName} {report.period.year}</p>
             </div>
           </div>
         )}
 
-        {/* No Data State */}
         {!loading && report && report.sales.length === 0 && report.returnRows.length === 0 && (
           <Card className="p-8 border-2 border-black text-center">
             <FileText className="w-12 h-12 mx-auto text-gray-400 mb-4" />

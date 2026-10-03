@@ -18,8 +18,6 @@ export async function GET(request: NextRequest) {
     const startDate = new Date(startDateStr);
     const endDate = new Date(endDateStr);
 
-    // Total inventory value & qty on hand: sum across all products with qty > 0,
-    // using each product's most recent ORDER unitCost (with brand discount if applicable).
     const products = await prisma.product.findMany({
       where: { currentQty: { gt: 0 } },
       include: {
@@ -56,8 +54,6 @@ export async function GET(request: NextRequest) {
     }
     const currentInventory = totalQtyOnHand - discontinuedInStock;
 
-    // Returns in window: WRITE_OFF rows with reason='return' in date range.
-    // Credit value per row = quantity * product's most-recent ORDER cost (with brand discount).
     const returnWriteOffs = await prisma.inventoryTransaction.findMany({
       where: {
         transactionType: 'WRITE_OFF',
@@ -97,7 +93,6 @@ export async function GET(request: NextRequest) {
       returnsCreditValue += unitCost * wo.quantity;
     }
 
-    // Outstanding credit balance across all brands: walk full ledger to "now".
     const allReturns = await prisma.inventoryTransaction.findMany({
       where: { transactionType: 'WRITE_OFF', writeOffReason: 'return' },
       include: {

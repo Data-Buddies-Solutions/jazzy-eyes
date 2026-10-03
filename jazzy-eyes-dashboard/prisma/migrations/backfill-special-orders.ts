@@ -2,19 +2,6 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-/**
- * Backfills `isSpecialOrder = true` on all InventoryTransaction rows whose
- * `notes` column mentions "special order" (case-insensitive).
- *
- * Historically, staff tracked special orders by typing "Special Order - <patient>"
- * into the free-text notes field. This script migrates that information onto
- * the first-class `isSpecialOrder` boolean without modifying the notes text.
- *
- * Idempotent: safe to re-run.
- *
- * Usage:
- *   npx tsx prisma/migrations/backfill-special-orders.ts
- */
 async function main() {
   console.log('🔄 Backfilling isSpecialOrder flag from notes...\n');
 

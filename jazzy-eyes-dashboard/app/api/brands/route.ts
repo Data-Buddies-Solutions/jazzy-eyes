@@ -14,7 +14,6 @@ export async function GET() {
       orderBy: [{ companyId: 'asc' }, { id: 'asc' }],
     });
 
-    // Group brands by company
     const companyMap = new Map<number, CompanyGroup>();
 
     brands.forEach((brand) => {
@@ -45,7 +44,6 @@ export async function GET() {
 
     const companies = Array.from(companyMap.values());
 
-    // Also return flat brands list for backward compatibility (sorted alphabetically)
     const simpleBrands = brands
       .map((b) => ({
         id: b.id,
@@ -70,7 +68,6 @@ export async function POST(request: Request) {
     const { type } = body;
 
     if (type === 'company') {
-      // Create new company
       const validation = createCompanySchema.safeParse(body);
       if (!validation.success) {
         return NextResponse.json(
@@ -81,7 +78,6 @@ export async function POST(request: Request) {
 
       const { companyName } = validation.data;
 
-      // Generate next company ID (round up to nearest thousand)
       const maxCompany = await prisma.brand.findFirst({
         orderBy: { companyId: 'desc' },
         select: { companyId: true },
@@ -97,7 +93,6 @@ export async function POST(request: Request) {
         message: `Company ID ${nextCompanyId} is ready. You can now add brands to this company.`,
       });
     } else if (type === 'brand') {
-      // Create new brand
       const validation = createBrandSchema.safeParse(body);
       if (!validation.success) {
         return NextResponse.json(
@@ -109,7 +104,6 @@ export async function POST(request: Request) {
       const { brandId, companyName, companyId, brandName, allocationQuantity } =
         validation.data;
 
-      // Check if brand ID already exists
       const existingBrand = await prisma.brand.findUnique({
         where: { id: brandId },
       });
@@ -121,7 +115,6 @@ export async function POST(request: Request) {
         );
       }
 
-      // Create brand with manual ID
       const brand = await prisma.brand.create({
         data: {
           id: brandId,

@@ -94,7 +94,6 @@ export default function InventoryReportPage() {
   const [allSpecialOrders, setAllSpecialOrders] = useState<SpecialOrder[]>([]);
   const [specialOrdersLoading, setSpecialOrdersLoading] = useState(false);
 
-  // Fetch brands on mount
   useEffect(() => {
     const fetchBrands = async () => {
       try {
@@ -112,7 +111,6 @@ export default function InventoryReportPage() {
     fetchBrands();
   }, []);
 
-  // Fetch inventory report when brand changes (normal mode)
   useEffect(() => {
     if (specialOrdersMode) return;
     if (!selectedBrandId) {
@@ -146,7 +144,6 @@ export default function InventoryReportPage() {
     fetchReport();
   }, [selectedBrandId, specialOrdersMode, selectedYear]);
 
-  // Fetch special orders (all or filtered by brand)
   const fetchSpecialOrders = useCallback(async (brandId?: string) => {
     setSpecialOrdersLoading(true);
     setError(null);
@@ -169,7 +166,6 @@ export default function InventoryReportPage() {
     }
   }, []);
 
-  // Refetch special orders when brand changes in special orders mode
   useEffect(() => {
     if (!specialOrdersMode) return;
     fetchSpecialOrders(selectedBrandId || undefined);
@@ -177,11 +173,9 @@ export default function InventoryReportPage() {
 
   const handleSpecialOrdersToggle = () => {
     if (specialOrdersMode) {
-      // Switch back to inventory mode
       setSpecialOrdersMode(false);
       setAllSpecialOrders([]);
     } else {
-      // Switch to special orders mode
       setSpecialOrdersMode(true);
       fetchSpecialOrders(selectedBrandId || undefined);
     }
@@ -205,7 +199,6 @@ export default function InventoryReportPage() {
 
   return (
     <>
-      {/* Print Styles */}
       <style jsx global>{`
         @media print {
           body {
@@ -301,7 +294,6 @@ export default function InventoryReportPage() {
       `}</style>
 
       <div className="space-y-6">
-        {/* Controls - Hidden when printing */}
         <div className="no-print flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -371,7 +363,6 @@ export default function InventoryReportPage() {
           </div>
         </div>
 
-        {/* Loading State */}
         {isLoading && (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin" />
@@ -379,14 +370,12 @@ export default function InventoryReportPage() {
           </div>
         )}
 
-        {/* Error State */}
         {error && (
           <Card className="p-6 border-2 border-red-500 bg-red-50">
             <p className="text-red-700">{error}</p>
           </Card>
         )}
 
-        {/* No Brand Selected (inventory mode only) */}
         {!specialOrdersMode && !selectedBrandId && !isLoading && (
           <Card className="p-8 border-2 border-black text-center">
             <FileText className="w-12 h-12 mx-auto text-gray-400 mb-4" />
@@ -397,10 +386,8 @@ export default function InventoryReportPage() {
           </Card>
         )}
 
-        {/* === SPECIAL ORDERS MODE === */}
         {specialOrdersMode && !specialOrdersLoading && (
           <div className="print-area space-y-6">
-            {/* Report Header */}
             <div className="report-header text-center border-b-2 border-black pb-4">
               <h1 className="text-2xl font-bold">Jazzy Eyes</h1>
               <h2 className="text-xl font-semibold mt-1">
@@ -418,7 +405,6 @@ export default function InventoryReportPage() {
               </p>
             </div>
 
-            {/* Summary */}
             <div className="summary-cards grid grid-cols-2 md:grid-cols-3 gap-4">
               <Card className="p-4 border-2 border-black">
                 <p className="text-sm text-gray-600">Total Special Orders</p>
@@ -444,7 +430,6 @@ export default function InventoryReportPage() {
               </Card>
             </div>
 
-            {/* Special Orders Table */}
             {allSpecialOrders.length === 0 ? (
               <Card className="p-8 border-2 border-black text-center">
                 <PackageCheck className="w-12 h-12 mx-auto text-gray-400 mb-4" />
@@ -528,7 +513,6 @@ export default function InventoryReportPage() {
               </Card>
             )}
 
-            {/* Footer */}
             <div className="report-footer text-center text-sm text-gray-500 pt-4 border-t">
               <p>
                 Jazzy Eyes — Special Orders Report
@@ -538,10 +522,8 @@ export default function InventoryReportPage() {
           </div>
         )}
 
-        {/* === INVENTORY MODE === */}
         {!specialOrdersMode && !loading && report && (report.frames.length > 0 || report.specialOrders.length > 0) && (
           <div className="print-area space-y-6">
-            {/* Report Header */}
             <div className="report-header text-center border-b-2 border-black pb-4">
               <h1 className="text-2xl font-bold">Jazzy Eyes</h1>
               <h2 className="text-xl font-semibold mt-1">
@@ -559,7 +541,6 @@ export default function InventoryReportPage() {
               </p>
             </div>
 
-            {/* Inventory Flow Summary */}
             <Card className="print-card p-4 border-2 border-black">
               <h2 className="text-lg font-bold mb-1">Inventory Flow — {selectedYear}</h2>
               <p className="text-xs text-gray-500 mb-3">
@@ -600,7 +581,6 @@ export default function InventoryReportPage() {
               )}
             </Card>
 
-            {/* Frames Table */}
             <Card className="print-card p-4 border-2 border-black">
               <h2 className="text-lg font-bold mb-3">
                 Frames ({report.frames.length})
@@ -655,7 +635,6 @@ export default function InventoryReportPage() {
               </div>
             </Card>
 
-            {/* Special Orders in Inventory Mode */}
             {report.specialOrders.length > 0 && (
               <Card className="print-card p-4 border-2 border-black">
                 <h2 className="text-lg font-bold mb-3">
@@ -727,14 +706,12 @@ export default function InventoryReportPage() {
               </Card>
             )}
 
-            {/* Footer */}
             <div className="report-footer text-center text-sm text-gray-500 pt-4 border-t">
               <p>Jazzy Eyes — Inventory Report — {report.brandName}</p>
             </div>
           </div>
         )}
 
-        {/* No Data State (inventory mode) */}
         {!specialOrdersMode && !loading && report && report.frames.length === 0 && report.specialOrders.length === 0 && (
           <Card className="p-8 border-2 border-black text-center">
             <FileText className="w-12 h-12 mx-auto text-gray-400 mb-4" />

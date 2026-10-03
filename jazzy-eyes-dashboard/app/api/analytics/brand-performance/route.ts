@@ -18,7 +18,6 @@ export async function GET(request: NextRequest) {
     const startDate = new Date(startDateStr);
     const endDate = new Date(endDateStr);
 
-    // Get all brands with their products and transactions
     const brands = await prisma.brand.findMany({
       include: {
         products: {
@@ -48,29 +47,23 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Calculate metrics for each brand
     const brandPerformanceData = brands.map((brand) => {
-      // Get all products for this brand
       const allProducts = brand.products;
 
-      // Current inventory: products not sold
       const totalInventory = allProducts.filter(
         (p) => p.status?.name !== 'Sold'
       ).length;
 
-      // Get sale transactions in date range (inventory sales)
       const saleTransactions = allProducts.flatMap((p) =>
         p.transactions.filter((t) => t.transactionType === 'SALE')
       );
 
-      // Get RX sales in date range
       const rxSales = brand.rxSales;
 
       const inventorySold = saleTransactions.length;
       const rxSold = rxSales.length;
       const totalSold = inventorySold + rxSold;
 
-      // Calculate revenue (inventory + RX)
       const inventoryRevenue = saleTransactions.reduce(
         (sum, t) => sum + Number(t.unitPrice),
         0
@@ -81,14 +74,11 @@ export async function GET(request: NextRequest) {
       );
       const revenue = inventoryRevenue + rxRevenue;
 
-      // Calculate average margin (including RX sales with cost data)
       let avgMargin = 0;
       if (totalSold > 0) {
         let marginsSum = 0;
         let marginsCount = 0;
 
-        // Inventory sale margins (use SALE transaction's unitCost which includes FIFO + brand discount)
-        // Fallback to ORDER cost for older sales where unitCost was not recorded
         saleTransactions.forEach((saleTransaction) => {
           const salePrice = Number(saleTransaction.unitPrice);
           let costPrice = Number(saleTransaction.unitCost);
@@ -101,7 +91,6 @@ export async function GET(request: NextRequest) {
             );
             if (orderTransaction) {
               costPrice = Number(orderTransaction.unitCost);
-              // Apply brand discount to fallback cost for sales on/after discount start date
               if (
                 brand.costDiscountPercent &&
                 Number(brand.costDiscountPercent) > 0 &&
@@ -119,7 +108,6 @@ export async function GET(request: NextRequest) {
           }
         });
 
-        // RX sale margins (if cost data exists)
         rxSales.forEach((rx) => {
           const salePrice = Number(rx.salePrice);
           const costPrice = Number(rx.costPrice);
@@ -133,11 +121,9 @@ export async function GET(request: NextRequest) {
         avgMargin = marginsCount > 0 ? marginsSum / marginsCount : 0;
       }
 
-      // Calculate sell-through rate (inventory only - RX doesn't affect inventory)
       const totalUnits = inventorySold + totalInventory;
       const sellThroughRate = totalUnits > 0 ? (inventorySold / totalUnits) * 100 : 0;
 
-      // Reorder recommendation: inventory < 20% of allocation
       const reorderRecommended =
         totalInventory < brand.allocationQuantity * 0.2;
 
@@ -157,7 +143,6 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    // Sort by sell-through rate descending
     brandPerformanceData.sort((a, b) => b.sellThroughRate - a.sellThroughRate);
 
     const response: BrandPerformanceResponse = {

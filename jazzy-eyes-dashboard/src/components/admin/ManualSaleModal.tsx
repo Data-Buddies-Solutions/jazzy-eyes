@@ -33,13 +33,12 @@ export function ManualSaleModal({
   const [quantity, setQuantity] = useState<number>(1);
   const [salePrice, setSalePrice] = useState<string>(frame.retailPrice.toString());
   const [saleDate, setSaleDate] = useState<string>(
-    new Date().toISOString().split('T')[0] // Format: YYYY-MM-DD
+    new Date().toISOString().split('T')[0]
   );
   const [isLoading, setIsLoading] = useState(false);
 
   const maxQty = frame.currentQty;
 
-  // Reset form when modal opens or frame changes
   useEffect(() => {
     if (open) {
       setQuantity(1);
@@ -63,11 +62,9 @@ export function ManualSaleModal({
       const price = parseFloat(salePrice);
       const finalPrice = price !== frame.retailPrice ? price : undefined;
 
-      // Convert date to ISO string for the API
       const dateObj = new Date(saleDate);
       const finalDate = dateObj.toISOString();
 
-      // Call the parent's onSubmit with quantity
       const response = await fetch(`/api/frames/${encodeURIComponent(frame.frameId)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -84,7 +81,6 @@ export function ManualSaleModal({
       if (result.success) {
         toast.success(result.message || `Sold ${quantity} unit(s) successfully!`);
         onOpenChange(false);
-        // Reset form
         setQuantity(1);
         onSuccess();
       } else {
@@ -114,7 +110,6 @@ export function ManualSaleModal({
           </DialogHeader>
 
           <div className="space-y-6 py-6">
-            {/* Frame Details */}
             <Card className="p-4 border-2 border-black bg-sky-soft/20">
               <div className="space-y-2">
                 <div className="flex justify-between">
@@ -152,7 +147,6 @@ export function ManualSaleModal({
               </div>
             </Card>
 
-            {/* Quantity Selector */}
             <div className="space-y-2">
               <Label>Quantity to Sell</Label>
               <div className="flex items-center gap-3">
@@ -195,7 +189,6 @@ export function ManualSaleModal({
               </div>
             </div>
 
-            {/* Sale Price Override */}
             <div className="space-y-2">
               <Label htmlFor="salePrice">
                 Sale Price per Unit (Optional Override)
@@ -224,7 +217,6 @@ export function ManualSaleModal({
               </p>
             </div>
 
-            {/* Sale Date */}
             <div className="space-y-2">
               <Label htmlFor="saleDate">Sale Date</Label>
               <Input
@@ -239,7 +231,6 @@ export function ManualSaleModal({
               </p>
             </div>
 
-            {/* Total Sale Amount */}
             <Card className="p-4 border-2 border-black bg-green-50">
               <div className="flex justify-between items-center">
                 <span className="font-semibold">Total Sale Amount:</span>

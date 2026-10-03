@@ -5,7 +5,6 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Seeding database...');
 
-  // Seed default frame statuses
   console.log('📋 Creating default frame statuses...');
 
   const defaultStatuses = [
@@ -28,14 +27,12 @@ async function main() {
 
   console.log('✅ Default statuses created successfully\n');
 
-  // Seed test frames
   console.log('👓 Creating test frames...');
 
   const activeStatus = await prisma.frameStatus.findUnique({ where: { name: 'Active' } });
 
   if (activeStatus) {
     const testFrames = [
-      // 2 more Gucci frames
       {
         compositeId: '1001-GG0002-TRT-54-17-140',
         brandId: 1001,
@@ -58,7 +55,6 @@ async function main() {
         frameType: 'Semi-Rimless',
         productType: 'Sun',
       },
-      // 2 Tom Ford frames
       {
         compositeId: '3001-TF5001-BLK-55-16-145',
         brandId: 3001,
@@ -81,7 +77,6 @@ async function main() {
         frameType: 'Full Rim',
         productType: 'Sun',
       },
-      // 5 Salt frames
       {
         compositeId: '7000-SALT001-BLK-50-20-145',
         brandId: 7000,
@@ -150,17 +145,13 @@ async function main() {
 
     console.log(`✅ Created ${testFrames.length} test frames\n`);
 
-    // Add pricing transactions for test frames
     console.log('💰 Adding pricing transactions...');
 
     const pricingData = [
-      // Gucci frames
       { compositeId: '1001-GG0002-TRT-54-17-140', cost: 180, retail: 450 },
       { compositeId: '1001-GG0003-GLD-51-18-145', cost: 195, retail: 485 },
-      // Tom Ford frames
       { compositeId: '3001-TF5001-BLK-55-16-145', cost: 210, retail: 525 },
       { compositeId: '3001-TF5002-HVN-53-17-140', cost: 220, retail: 550 },
-      // Salt frames
       { compositeId: '7000-SALT001-BLK-50-20-145', cost: 160, retail: 400 },
       { compositeId: '7000-SALT002-SLV-52-18-140', cost: 165, retail: 410 },
       { compositeId: '7000-SALT003-GRY-49-19-135', cost: 155, retail: 390 },
@@ -190,7 +181,6 @@ async function main() {
     console.log('  ⚠️  Active status not found, skipping test frames\n');
   }
 
-  // Backfill existing products with statuses
   console.log('🔄 Backfilling existing products with statuses...');
 
   const products = await prisma.product.findMany({
@@ -213,20 +203,17 @@ async function main() {
     let discontinuedCount = 0;
 
     for (const product of products) {
-      // Skip if already has a status
       if (product.statusId) {
         continue;
       }
 
       let statusId = activeStatus?.id;
 
-      // Check if sold (has SALE transaction)
       const saleTransaction = product.transactions.find((t) => t.transactionType === 'SALE');
       if (saleTransaction && soldStatus) {
         statusId = soldStatus.id;
         soldCount++;
       } else {
-        // Check if discontinued
         const orderTransaction = product.transactions.find((t) => t.transactionType === 'ORDER');
         if (
           (orderTransaction?.status === 'discontinued' ||

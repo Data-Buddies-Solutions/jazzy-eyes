@@ -78,7 +78,6 @@ export async function PUT(
       );
     }
 
-    // Check if status exists
     const existingStatus = await prisma.frameStatus.findUnique({
       where: { id: statusId },
       include: {
@@ -95,7 +94,6 @@ export async function PUT(
       );
     }
 
-    // Prevent editing protected statuses
     if (existingStatus.isProtected) {
       return NextResponse.json(
         { success: false, error: 'Cannot edit protected status "Sold"' },
@@ -103,7 +101,6 @@ export async function PUT(
       );
     }
 
-    // If renaming, check name uniqueness
     if (validation.data.name && validation.data.name !== existingStatus.name) {
       const duplicateName = await prisma.frameStatus.findUnique({
         where: { name: validation.data.name },
@@ -117,7 +114,6 @@ export async function PUT(
       }
     }
 
-    // If status has products and not confirmed, require confirmation
     if (existingStatus._count.products > 0 && !body.confirmed) {
       return NextResponse.json(
         {
@@ -180,7 +176,6 @@ export async function DELETE(
       );
     }
 
-    // Prevent deletion of protected statuses
     if (existingStatus.isProtected) {
       return NextResponse.json(
         { success: false, error: 'Cannot delete protected status "Sold"' },
@@ -188,7 +183,6 @@ export async function DELETE(
       );
     }
 
-    // Prevent deletion if status has products
     if (existingStatus._count.products > 0) {
       return NextResponse.json(
         {

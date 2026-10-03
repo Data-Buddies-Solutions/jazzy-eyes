@@ -134,7 +134,6 @@ export default function WriteOffsPage() {
         </p>
       </div>
 
-      {/* Summary */}
       <div className="flex gap-4">
         <div className="bg-white border-2 border-black rounded-lg p-4">
           <div className="text-sm text-gray-600">Active Write-offs</div>
@@ -146,7 +145,6 @@ export default function WriteOffsPage() {
         </div>
       </div>
 
-      {/* Write-offs Table */}
       <div className="bg-white border-2 border-black rounded-lg overflow-hidden">
         {isLoading ? (
           <div className="flex justify-center items-center py-12">
@@ -236,7 +234,6 @@ export default function WriteOffsPage() {
         )}
       </div>
 
-      {/* Revert Confirmation Dialog */}
       <AlertDialog open={revertConfirmOpen} onOpenChange={setRevertConfirmOpen}>
         <AlertDialogContent className="border-2 border-black">
           <AlertDialogHeader>

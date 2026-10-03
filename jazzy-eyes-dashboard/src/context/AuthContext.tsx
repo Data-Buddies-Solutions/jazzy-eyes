@@ -12,7 +12,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  // Assume authenticated if we reach protected pages (middleware handles redirects)
   const [isAuthenticated, setIsAuthenticated] = useState(true);
 
   const logout = useCallback(async () => {

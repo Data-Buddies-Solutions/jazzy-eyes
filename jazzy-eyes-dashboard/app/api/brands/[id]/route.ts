@@ -78,7 +78,6 @@ export async function PUT(
       );
     }
 
-    // Check if brand exists and has products
     const existingBrand = await prisma.brand.findUnique({
       where: { id: brandId },
       include: {
@@ -95,7 +94,6 @@ export async function PUT(
       );
     }
 
-    // If brand has products and not confirmed, require confirmation
     if (existingBrand._count.products > 0 && !body.confirmed) {
       return NextResponse.json(
         {
@@ -108,9 +106,7 @@ export async function PUT(
       );
     }
 
-    // Check if changing brand ID
     if (validation.data.id && validation.data.id !== brandId) {
-      // Check if new ID already exists
       const existingBrandWithNewId = await prisma.brand.findUnique({
         where: { id: validation.data.id },
       });
@@ -122,7 +118,6 @@ export async function PUT(
         );
       }
 
-      // Delete old brand and create with new ID (to preserve foreign key relationships)
       await prisma.brand.delete({
         where: { id: brandId },
       });
@@ -150,7 +145,6 @@ export async function PUT(
       });
     }
 
-    // Update brand normally (no ID change)
     const updatedBrand = await prisma.brand.update({
       where: { id: brandId },
       data: validation.data,
@@ -191,7 +185,6 @@ export async function DELETE(
       );
     }
 
-    // Check if brand exists and has products
     const existingBrand = await prisma.brand.findUnique({
       where: { id: brandId },
       include: {
@@ -208,7 +201,6 @@ export async function DELETE(
       );
     }
 
-    // Prevent deletion if brand has products
     if (existingBrand._count.products > 0) {
       return NextResponse.json(
         {
@@ -219,7 +211,6 @@ export async function DELETE(
       );
     }
 
-    // Safe to delete - no products reference this brand
     await prisma.brand.delete({
       where: { id: brandId },
     });

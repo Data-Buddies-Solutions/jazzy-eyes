@@ -12,7 +12,6 @@ interface MarginsChartProps {
 const fmtMoney = (n: number) =>
   `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-// Treat "Sun" and "Sunglasses" as the same category.
 const normalizeProductType = (t: string) =>
   t.toLowerCase().startsWith('sun') ? 'Sun' : t;
 
@@ -90,7 +89,6 @@ export function MarginsChart({ dateRange }: MarginsChartProps) {
   );
   const totalMargin = totals.revenue > 0 ? (totals.grossProfit / totals.revenue) * 100 : 0;
 
-  // Merge Sun + Sunglasses into a single product type
   const mergedProductTypes = new Map<string, { revenue: number; profit: number }>();
   for (const p of data.byProductType) {
     const key = normalizeProductType(p.productType);

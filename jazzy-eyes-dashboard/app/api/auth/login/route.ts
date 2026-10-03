@@ -4,7 +4,6 @@ export async function POST(request: NextRequest) {
   try {
     const { email, password } = await request.json();
 
-    // Get credentials from environment variables
     const adminEmail = process.env.ADMIN_EMAIL;
     const adminPassword = process.env.ADMIN_PASSWORD;
 
@@ -16,7 +15,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate credentials
     if (email !== adminEmail || password !== adminPassword) {
       return NextResponse.json(
         { success: false, error: 'Invalid email or password' },
@@ -24,16 +22,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create response with auth cookie
     const response = NextResponse.json({ success: true });
 
-    // Set httpOnly cookie for auth session
-    // Cookie expires in 30 days
     response.cookies.set('jazzy-eyes-session', 'authenticated', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 30, // 30 days
+      maxAge: 60 * 60 * 24 * 30,
       path: '/',
     });
 

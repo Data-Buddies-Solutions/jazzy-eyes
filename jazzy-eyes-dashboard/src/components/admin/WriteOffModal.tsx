@@ -87,7 +87,6 @@ export function WriteOffModal({
       if (result.success) {
         toast.success(result.message || `Written off ${quantity} unit(s) successfully!`);
         onOpenChange(false);
-        // Reset form
         setQuantity(1);
         setReason('');
         setNotes('');
@@ -121,7 +120,6 @@ export function WriteOffModal({
           </DialogHeader>
 
           <div className="space-y-6 py-6">
-            {/* Frame Details */}
             <Card className="p-4 border-2 border-black bg-sky-soft/20">
               <div className="space-y-2">
                 <div className="flex justify-between">
@@ -149,7 +147,6 @@ export function WriteOffModal({
               </div>
             </Card>
 
-            {/* Quantity Selector */}
             <div className="space-y-2">
               <Label>Quantity to Write Off</Label>
               <div className="flex items-center gap-3">
@@ -192,7 +189,6 @@ export function WriteOffModal({
               </div>
             </div>
 
-            {/* Reason Select */}
             <div className="space-y-2">
               <Label htmlFor="reason">Reason *</Label>
               <Select value={reason} onValueChange={(value) => setReason(value as WriteOffReason)}>
@@ -209,7 +205,6 @@ export function WriteOffModal({
               </Select>
             </div>
 
-            {/* Notes */}
             <div className="space-y-2">
               <Label htmlFor="notes">Notes (Optional)</Label>
               <Textarea
@@ -222,7 +217,6 @@ export function WriteOffModal({
               />
             </div>
 
-            {/* Total Loss Amount */}
             <Card className={`p-4 border-2 ${isReturn ? 'border-blue-300 bg-blue-50' : 'border-red-300 bg-red-50'}`}>
               <div className="flex justify-between items-center">
                 <span className="font-semibold">{isReturn ? 'Cost Impact:' : 'Total Loss (at cost):'}</span>

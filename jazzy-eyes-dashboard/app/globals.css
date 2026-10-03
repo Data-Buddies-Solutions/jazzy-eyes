@@ -1,7 +1,6 @@
 @import "tailwindcss";
 
 @theme {
-  /* Light blue theme - using sky-soft and sky-deeper colors */
   --color-background: #fafafa;
   --color-foreground: #1a202c;
 
@@ -11,26 +10,25 @@
   --color-popover: #ffffff;
   --color-popover-foreground: #1a202c;
 
-  --color-primary: #87ceeb; /* sky-deeper */
-  --color-primary-foreground: #1a202c; /* black text on blue buttons */
+  --color-primary: #87ceeb;
+  --color-primary-foreground: #1a202c;
 
-  --color-secondary: #c1f1ff; /* sky-soft */
+  --color-secondary: #c1f1ff;
   --color-secondary-foreground: #1a202c;
 
   --color-muted: #f7fafc;
   --color-muted-foreground: #718096;
 
-  --color-accent: #c1f1ff; /* sky-soft */
+  --color-accent: #c1f1ff;
   --color-accent-foreground: #1a202c;
 
-  --color-destructive: #ef4444; /* error */
+  --color-destructive: #ef4444;
   --color-destructive-foreground: #ffffff;
 
   --color-border: #e2e8f0;
   --color-input: #e2e8f0;
-  --color-ring: #87ceeb; /* sky-deeper for focus rings */
+  --color-ring: #87ceeb;
 
-  /* Custom colors */
   --color-sky-soft: #c1f1ff;
   --color-sky-deeper: #87ceeb;
   --color-neutral: #c1f1ff;

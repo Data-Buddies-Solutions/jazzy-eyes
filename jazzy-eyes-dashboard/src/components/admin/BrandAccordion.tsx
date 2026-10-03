@@ -72,7 +72,6 @@ export function BrandAccordion({
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-6 py-4 bg-white">
-            {/* Company Actions */}
             <div className="flex gap-2 mb-4 pb-4 border-b-2 border-gray-200">
               <Button
                 onClick={() => onEditCompany(company.companyId, company.companyName)}
@@ -93,7 +92,6 @@ export function BrandAccordion({
               </Button>
             </div>
 
-            {/* Brand Cards */}
             {company.brands.length === 0 ? (
               <p className="text-center text-gray-500 py-8">
                 No brands yet. Click "Add Brand" to create one.

@@ -74,7 +74,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   return (
     <>
-      {/* Overlay */}
       {isOpen && (
         <div
           className="fixed inset-0 bg-black/50 z-40"
@@ -83,7 +82,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         />
       )}
 
-      {/* Sidebar */}
       <aside
         className={cn(
           'fixed top-0 right-0 z-50 w-72 bg-white border-l-2 border-black transition-transform duration-300 flex flex-col',
@@ -91,7 +89,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         )}
         style={{ height: '100vh' }}
       >
-        {/* Header */}
         <div className="flex items-center justify-between p-4 border-b-2 border-black flex-shrink-0">
           <div className="flex items-center space-x-2">
             <Store className="w-6 h-6 text-sky-deeper" />
@@ -106,7 +103,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           </Button>
         </div>
 
-        {/* Navigation */}
         <nav className="p-4 space-y-2 flex-1 overflow-y-auto">
           {navigation.map((item) => {
             const isActive = pathname === item.href;
@@ -144,7 +140,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           })}
         </nav>
 
-        {/* Footer */}
         <div className="p-4 border-t-2 border-black flex-shrink-0">
           <Button
             variant="outline"

@@ -88,7 +88,6 @@ export function SalesTrendsChart({ dateRange }: SalesTrendsChartProps) {
     );
   }
 
-  // Transform brand trends data for stacked area chart
   const brandTrendData = data.dailySales.map((day) => {
     const dayData: any = { date: day.date };
     data.brandTrends.forEach((brand) => {
@@ -105,7 +104,6 @@ export function SalesTrendsChart({ dateRange }: SalesTrendsChartProps) {
         <p className="text-sm text-gray-600">Revenue patterns over time</p>
       </div>
 
-      {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <MetricCard
           title="Avg Daily Revenue"
@@ -126,7 +124,6 @@ export function SalesTrendsChart({ dateRange }: SalesTrendsChartProps) {
         />
       </div>
 
-      {/* Overall Trend Line Chart */}
       <div className="mb-6">
         <h3 className="text-lg font-semibold mb-4">Overall Revenue Trend</h3>
         <ResponsiveContainer width="100%" height={300}>
@@ -158,7 +155,6 @@ export function SalesTrendsChart({ dateRange }: SalesTrendsChartProps) {
         </ResponsiveContainer>
       </div>
 
-      {/* Brand Contribution Stacked Area Chart */}
       {data.brandTrends.length > 0 && brandTrendData.length > 0 && (
         <div>
           <h3 className="text-lg font-semibold mb-4">Revenue by Brand</h3>

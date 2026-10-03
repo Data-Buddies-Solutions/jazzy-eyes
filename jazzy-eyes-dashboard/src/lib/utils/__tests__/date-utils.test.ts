@@ -49,7 +49,6 @@ describe('formatDateRange', () => {
 
 describe('getDateRangePreset', () => {
   beforeEach(() => {
-    // Mock current date to Jan 15, 2025
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2025, 0, 15, 12, 0, 0));
   });

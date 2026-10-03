@@ -15,27 +15,6 @@ export interface BrandCreditSummary {
   endingCreditBalance: number;
 }
 
-/**
- * Window-scoped credit ledger per brand, chain-consistent across periods.
- *
- * Definitions:
- *   cumCreds(t) = sum of all RETURN_CREDIT events with date < t
- *   cumCogs(t)  = sum of all COST events with date < t
- *   used(t)     = min(cumCreds(t), cumCogs(t))   // credit "consumed" through t
- *   balance(t)  = cumCreds(t) − used(t)          // outstanding credit at t
- *
- * For a window [start, end]:
- *   startingCreditBalance = balance(start)
- *   endingCreditBalance   = balance(end+ε)        // includes events on endDate
- *   returnCredits         = sum credits in window
- *   creditsApplied        = used(end) − used(start)
- *
- * Invariants:
- *   - starting + returnCredits = applied + ending  (rows add up)
- *   - ending of period N = starting of period N+1  (chains across months)
- *   - balance ≥ 0 (capped at 0 when cogs ≥ credits cumulatively)
- *   - order of events WITHIN a window does NOT affect totals
- */
 export function calculateReturnCreditSummaries(
   events: CreditLedgerEvent[],
   startDate: Date,

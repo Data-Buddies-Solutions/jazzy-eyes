@@ -29,11 +29,10 @@ export async function GET() {
       quantity: wo.quantity,
       reason: wo.writeOffReason,
       notes: wo.notes,
-      isReverted: false, // Will check below
+      isReverted: false,
       revertedByTransactionId: null as number | null,
     }));
 
-    // Check which write-offs have been reverted
     const revertTransactions = await prisma.inventoryTransaction.findMany({
       where: {
         transactionType: 'REVERT_WRITE_OFF',

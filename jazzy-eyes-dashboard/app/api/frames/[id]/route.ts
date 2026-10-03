@@ -41,7 +41,6 @@ export async function GET(
   }
 }
 
-// Generate compositeId in format: {brandId}-{styleNumber}-{colorCode}-{eyeSize}
 function generateCompositeId(
   brandId: number,
   styleNumber: string,
@@ -60,7 +59,6 @@ export async function PUT(
     const compositeId = id;
     const body = await request.json();
 
-    // Check if frame exists
     const existingProduct = await prisma.product.findUnique({
       where: { compositeId },
       include: { transactions: true },
@@ -73,7 +71,6 @@ export async function PUT(
       );
     }
 
-    // Determine new field values
     const newBrandId = body.brandId !== undefined ? body.brandId : existingProduct.brandId;
     const newStyleNumber = body.styleNumber !== undefined ? body.styleNumber : existingProduct.styleNumber;
     const newColorCode = body.colorCode !== undefined ? body.colorCode : existingProduct.colorCode;
@@ -82,14 +79,12 @@ export async function PUT(
     const newFrameType = body.frameType !== undefined ? body.frameType : existingProduct.frameType;
     const newProductType = body.productType !== undefined ? body.productType : existingProduct.productType;
 
-    // Check if any ID-related fields changed
     const newCompositeId = generateCompositeId(newBrandId, newStyleNumber, newColorCode, newEyeSize);
     const idChanged = newCompositeId !== compositeId;
 
     let updatedProduct;
 
     if (idChanged) {
-      // Check if new ID already exists
       const existingWithNewId = await prisma.product.findUnique({
         where: { compositeId: newCompositeId },
       });
@@ -101,9 +96,7 @@ export async function PUT(
         );
       }
 
-      // Migrate to new composite ID using transaction
       await prisma.$transaction(async (tx) => {
-        // 1. Create new product with new composite ID
         await tx.product.create({
           data: {
             compositeId: newCompositeId,
@@ -120,25 +113,21 @@ export async function PUT(
           },
         });
 
-        // 2. Update all transactions to point to new ID
         await tx.inventoryTransaction.updateMany({
           where: { productId: compositeId },
           data: { productId: newCompositeId },
         });
 
-        // 3. Delete old product
         await tx.product.delete({
           where: { compositeId },
         });
       });
 
-      // Fetch the updated product
       updatedProduct = await prisma.product.findUnique({
         where: { compositeId: newCompositeId },
         include: { transactions: true },
       });
     } else {
-      // No ID change, simple update
       updatedProduct = await prisma.product.update({
         where: { compositeId },
         data: {
@@ -153,7 +142,6 @@ export async function PUT(
       });
     }
 
-    // If cost/retail prices or invoice info changed, update the latest ORDER transaction
     if (
       body.costPrice !== undefined ||
       body.retailPrice !== undefined ||
@@ -198,10 +186,6 @@ export async function PUT(
   }
 }
 
-/**
- * Apply brand cost discount if applicable.
- * Returns the discounted cost, or the original cost if no discount applies.
- */
 async function applyBrandCostDiscount(
   brandId: number,
   cost: number,
@@ -222,10 +206,6 @@ async function applyBrandCostDiscount(
   return cost;
 }
 
-/**
- * Preview FIFO cost without modifying inventory batches.
- * Used to validate below-cost sales before committing.
- */
 async function previewFIFOCost(
   productId: string,
   quantityToConsume: number
@@ -253,15 +233,10 @@ async function previewFIFOCost(
   return quantityToConsume > 0 ? totalCost / quantityToConsume : 0;
 }
 
-/**
- * Helper function to consume inventory using FIFO logic
- * Returns the weighted average cost for the consumed quantity
- */
 async function consumeFIFOInventory(
   productId: string,
   quantityToConsume: number
 ): Promise<{ totalCost: number; avgCost: number }> {
-  // Get all ORDER and RESTOCK transactions with remainingQty > 0, ordered by date (oldest first)
   const batches = await prisma.inventoryTransaction.findMany({
     where: {
       productId,
@@ -280,7 +255,6 @@ async function consumeFIFOInventory(
     const availableInBatch = batch.remainingQty || 0;
     const consumeFromBatch = Math.min(availableInBatch, remainingToConsume);
 
-    // Update the batch's remainingQty
     await prisma.inventoryTransaction.update({
       where: { id: batch.id },
       data: { remainingQty: availableInBatch - consumeFromBatch },
@@ -294,27 +268,18 @@ async function consumeFIFOInventory(
   return { totalCost, avgCost };
 }
 
-/**
- * Helper function to get the "Sold Out" status
- */
 async function getSoldOutStatus() {
   return await prisma.frameStatus.findUnique({
     where: { name: 'Sold Out' },
   });
 }
 
-/**
- * Helper function to get the "Active" status
- */
 async function getActiveStatus() {
   return await prisma.frameStatus.findUnique({
     where: { name: 'Active' },
   });
 }
 
-/**
- * Helper function to get the latest cost price from transactions
- */
 async function getLatestCostPrice(productId: string): Promise<number> {
   const latestBatch = await prisma.inventoryTransaction.findFirst({
     where: {
@@ -326,9 +291,6 @@ async function getLatestCostPrice(productId: string): Promise<number> {
   return latestBatch ? Number(latestBatch.unitCost) : 0;
 }
 
-/**
- * Helper function to get the retail price from ORDER transaction
- */
 async function getRetailPrice(productId: string): Promise<number> {
   const orderTransaction = await prisma.inventoryTransaction.findFirst({
     where: {
@@ -351,7 +313,6 @@ export async function PATCH(
 
     const { action } = body;
 
-    // Check if frame exists
     const existingProduct = await prisma.product.findUnique({
       where: { compositeId },
       include: {
@@ -369,11 +330,9 @@ export async function PATCH(
       );
     }
 
-    // ========== MARK AS SOLD ==========
     if (action === 'mark_as_sold') {
       const { quantity = 1, salePrice, saleDate } = body;
 
-      // Validate quantity
       if (quantity < 1) {
         return NextResponse.json(
           { success: false, error: 'Quantity must be at least 1' },
@@ -393,17 +352,14 @@ export async function PATCH(
 
       const finalSaleDate = saleDate ? new Date(saleDate) : new Date();
 
-      // Calculate FIFO cost preview (without consuming) to validate before mutating
       const previewCost = await previewFIFOCost(compositeId, quantity);
 
-      // Apply brand cost discount if applicable
       const discountedPreviewCost = await applyBrandCostDiscount(
         existingProduct.brandId,
         previewCost,
         finalSaleDate
       );
 
-      // Prevent selling below cost (using discounted cost)
       if (discountedPreviewCost > 0 && finalSalePrice < discountedPreviewCost) {
         return NextResponse.json(
           { success: false, error: `Sale price ($${finalSalePrice.toFixed(2)}) cannot be below wholesale cost ($${discountedPreviewCost.toFixed(2)})` },
@@ -411,10 +367,8 @@ export async function PATCH(
         );
       }
 
-      // Now actually consume FIFO inventory
       const { avgCost } = await consumeFIFOInventory(compositeId, quantity);
 
-      // Apply brand cost discount to FIFO cost
       const finalUnitCost = await applyBrandCostDiscount(
         existingProduct.brandId,
         avgCost,
@@ -423,7 +377,6 @@ export async function PATCH(
 
       const newQty = existingProduct.currentQty - quantity;
 
-      // Determine if we need to change status to "Sold Out"
       let statusUpdate = {};
       if (newQty === 0) {
         const soldOutStatus = await getSoldOutStatus();
@@ -432,7 +385,6 @@ export async function PATCH(
         }
       }
 
-      // Create SALE transaction and update product
       await prisma.$transaction([
         prisma.inventoryTransaction.create({
           data: {
@@ -462,11 +414,9 @@ export async function PATCH(
       });
     }
 
-    // ========== WRITE OFF ==========
     if (action === 'write_off') {
       const { quantity, reason, notes } = body;
 
-      // Validate quantity
       if (!quantity || quantity < 1) {
         return NextResponse.json(
           { success: false, error: 'Quantity must be at least 1' },
@@ -481,7 +431,6 @@ export async function PATCH(
         );
       }
 
-      // Validate reason
       const validReasons = ['damaged', 'lost', 'defective', 'return', 'other'];
       if (!reason || !validReasons.includes(reason)) {
         return NextResponse.json(
@@ -490,9 +439,6 @@ export async function PATCH(
         );
       }
 
-      // Get the cost for the write-off
-      // For 'return' reason, use $0 cost (no FIFO consumption)
-      // For other reasons, use FIFO cost
       let avgCost = 0;
       if (reason !== 'return') {
         const fifoResult = await consumeFIFOInventory(compositeId, quantity);
@@ -501,7 +447,6 @@ export async function PATCH(
 
       const newQty = existingProduct.currentQty - quantity;
 
-      // Determine if we need to change status to "Sold Out"
       let statusUpdate = {};
       if (newQty === 0) {
         const soldOutStatus = await getSoldOutStatus();
@@ -510,7 +455,6 @@ export async function PATCH(
         }
       }
 
-      // Create WRITE_OFF transaction and update product
       await prisma.$transaction([
         prisma.inventoryTransaction.create({
           data: {
@@ -541,7 +485,6 @@ export async function PATCH(
       });
     }
 
-    // ========== REVERT WRITE OFF ==========
     if (action === 'revert_write_off') {
       const { writeOffTransactionId, notes } = body;
 
@@ -552,7 +495,6 @@ export async function PATCH(
         );
       }
 
-      // Find the write-off transaction
       const writeOffTransaction = await prisma.inventoryTransaction.findUnique({
         where: { id: writeOffTransactionId },
       });
@@ -578,7 +520,6 @@ export async function PATCH(
         );
       }
 
-      // Check if already reverted
       const existingRevert = await prisma.inventoryTransaction.findFirst({
         where: {
           productId: compositeId,
@@ -597,7 +538,6 @@ export async function PATCH(
       const quantityToRestore = writeOffTransaction.quantity;
       const newQty = existingProduct.currentQty + quantityToRestore;
 
-      // Determine if we need to change status from "Sold Out" to "Active"
       let statusUpdate = {};
       if (existingProduct.status?.name === 'Sold Out') {
         const activeStatus = await getActiveStatus();
@@ -606,7 +546,6 @@ export async function PATCH(
         }
       }
 
-      // Create REVERT_WRITE_OFF transaction, restore inventory batch, and update product
       await prisma.$transaction([
         prisma.inventoryTransaction.create({
           data: {
@@ -618,7 +557,7 @@ export async function PATCH(
             unitPrice: 0,
             status: 'completed',
             revertedFromId: writeOffTransactionId,
-            remainingQty: quantityToRestore, // Restore as new inventory batch
+            remainingQty: quantityToRestore,
             notes: notes || `Reverted write-off #${writeOffTransactionId}`,
           },
         }),
@@ -638,11 +577,9 @@ export async function PATCH(
       });
     }
 
-    // ========== RESTOCK ==========
     if (action === 'restock') {
       const { quantity, invoiceDate, costPrice, notes, isSpecialOrder } = body;
 
-      // Validate quantity
       if (!quantity || quantity < 1) {
         return NextResponse.json(
           { success: false, error: 'Quantity must be at least 1' },
@@ -650,16 +587,13 @@ export async function PATCH(
         );
       }
 
-      // Get cost price (use provided or default to latest)
       const finalCostPrice = costPrice !== undefined ? costPrice : await getLatestCostPrice(compositeId);
-      // Use invoice date for transaction date if provided (for backlog entries)
       const finalInvoiceDate = invoiceDate ? new Date(invoiceDate) : null;
       const transactionDate = finalInvoiceDate || new Date();
       const retailPrice = await getRetailPrice(compositeId);
 
       const newQty = existingProduct.currentQty + quantity;
 
-      // Determine if we need to change status from "Sold Out" to "Active"
       let statusUpdate = {};
       if (existingProduct.status?.name === 'Sold Out') {
         const activeStatus = await getActiveStatus();
@@ -668,7 +602,6 @@ export async function PATCH(
         }
       }
 
-      // Create RESTOCK transaction and update product
       await prisma.$transaction([
         prisma.inventoryTransaction.create({
           data: {
@@ -680,7 +613,7 @@ export async function PATCH(
             unitCost: finalCostPrice,
             unitPrice: retailPrice,
             status: 'completed',
-            remainingQty: quantity, // New batch for FIFO
+            remainingQty: quantity,
             notes: notes || null,
             isSpecialOrder: isSpecialOrder === true,
           },
@@ -701,7 +634,6 @@ export async function PATCH(
       });
     }
 
-    // ========== CHANGE STATUS ==========
     if (action === 'change_status') {
       const { newStatusId } = body;
 
@@ -712,7 +644,6 @@ export async function PATCH(
         );
       }
 
-      // Get the new status
       const newStatus = await prisma.frameStatus.findUnique({
         where: { id: newStatusId },
       });
@@ -724,7 +655,6 @@ export async function PATCH(
         );
       }
 
-      // Prevent manually setting "Sold Out" status
       if (newStatus.isProtected && newStatus.name === 'Sold Out') {
         return NextResponse.json(
           {
@@ -735,7 +665,6 @@ export async function PATCH(
         );
       }
 
-      // Update product status
       await prisma.product.update({
         where: { compositeId },
         data: { statusId: newStatusId },
@@ -747,9 +676,7 @@ export async function PATCH(
       });
     }
 
-    // ========== GET TRANSACTION HISTORY ==========
     if (action === 'get_transactions') {
-      // Get all REVERT_WRITE_OFF transactions to know which write-offs have been reverted
       const revertTransactions = await prisma.inventoryTransaction.findMany({
         where: {
           productId: compositeId,
@@ -760,7 +687,6 @@ export async function PATCH(
 
       const revertedIds = new Set(revertTransactions.map(t => t.revertedFromId).filter(Boolean));
 
-      // Format transactions with isReverted flag for WRITE_OFF transactions
       const transactions = existingProduct.transactions.map(t => ({
         id: t.id,
         transactionType: t.transactionType,
@@ -782,7 +708,6 @@ export async function PATCH(
     }
 
     if (action === 'mark_as_discontinued') {
-      // For now, we'll add a note to indicate discontinued
       const orderTransaction = existingProduct.transactions.find(
         (t) => t.transactionType === 'ORDER'
       );
