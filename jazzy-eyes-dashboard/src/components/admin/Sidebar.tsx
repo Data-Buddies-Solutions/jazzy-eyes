@@ -57,6 +57,11 @@ const navigation: NavItem[] = [
     icon: FileText,
   },
   {
+    name: 'Sales Rep Report',
+    href: '/admin/reports/sales-rep',
+    icon: FileText,
+  },
+  {
     name: 'Inventory Report',
     href: '/admin/reports/inventory',
     icon: FileText,
