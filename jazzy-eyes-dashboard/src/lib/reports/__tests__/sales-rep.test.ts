@@ -40,6 +40,28 @@ describe('sales rep report', () => {
     const tx = [t(1, 'ORDER', '2026-08-01')];
     expect(selectRepRows([row(tx, 1, '100'), row(tx, 1, '20')]).map(r => r.model)).toEqual(['20', '100']);
   });
+  it('shows each remaining unit with its own receipt date and age', () => {
+    const result = row([t(1, 'ORDER', '2026-06-01'), t(2, 'RESTOCK', '2026-10-02', 2)], 3);
+    expect(result.units).toEqual([
+      { status: 'In stock', receivedDate: '2026-06-01', soldDate: null, daysOnShelf: 124 },
+      { status: 'In stock', receivedDate: '2026-10-02', soldDate: null, daysOnShelf: 1 },
+      { status: 'In stock', receivedDate: '2026-10-02', soldDate: null, daysOnShelf: 1 },
+    ]);
+  });
+  it('matches period sales to oldest receipts and stops age at the sale date', () => {
+    const result = row([t(1, 'ORDER', '2026-07-01'), t(2, 'RESTOCK', '2026-08-01', 2), t(3, 'SALE', '2026-09-01', 2)]);
+    expect(result.units).toEqual([
+      { status: 'In stock', receivedDate: '2026-08-01', soldDate: null, daysOnShelf: 63 },
+      { status: 'Sold', receivedDate: '2026-07-01', soldDate: '2026-09-01', daysOnShelf: 62 },
+      { status: 'Sold', receivedDate: '2026-08-01', soldDate: '2026-09-01', daysOnShelf: 31 },
+    ]);
+  });
+  it('does not invent unit receipt dates when stock and history disagree', () => {
+    expect(row([t(1, 'ORDER', '2026-08-01')], 2).units).toEqual([
+      { status: 'In stock', receivedDate: null, soldDate: null, daysOnShelf: null },
+      { status: 'In stock', receivedDate: null, soldDate: null, daysOnShelf: null },
+    ]);
+  });
   it('validates date-only inputs including impossible dates', () => {
     for (const input of [null, '', '2026-02-30', '2026-13-01', '2026-1-01', 'invalid']) expect(parseReportDate(input)).toBeNull();
     expect(parseReportDate('2026-09-30')?.toISOString()).toBe('2026-09-30T00:00:00.000Z');

@@ -17,15 +17,22 @@ export type RepProduct = {
   currentQty: number;
   transactions: RepTransaction[];
 };
+export type RepUnit = {
+  status: 'In stock' | 'Sold';
+  receivedDate: string | null;
+  soldDate: string | null;
+  daysOnShelf: number | null;
+};
 export type RepRow = {
   frameId: string; brand: string; model: string; color: string; size: string;
   currentQty: number; received: number; sold: number;
   lastReceived: string | null; lastSold: string | null;
   daysOnShelf: number | null;
   ageBand: string;
+  units: RepUnit[];
 };
 export type RepReport = {
-  companyName: string; brandName: string | null; startDate: string; endDate: string;
+  brandName: string; startDate: string; endDate: string;
   asOf: string; frames: RepRow[];
 };
 export function parseReportDate(value: string | null): Date | null {
@@ -41,6 +48,7 @@ export function buildRepRow(product: RepProduct, brand: string, start: string, e
   let lastReceived: string | null = null, lastSold: string | null = null;
   let uncertain = false;
   const lots: Lot[] = [];
+  const soldUnits: RepUnit[] = [];
   const removed = new Map<number, Lot[]>();
   const transactions = product.transactions.filter(t => t.status === 'completed' && dateKey(t.transactionDate) <= asOf)
     .sort((a, b) => a.transactionDate.getTime() - b.transactionDate.getTime() || a.id - b.id);
@@ -67,6 +75,15 @@ export function buildRepRow(product: RepProduct, brand: string, start: string, e
       }
       if (remaining > 0) { consumed.push({ date: null, quantity: remaining }); uncertain = true; }
       if (t.transactionType === 'WRITE_OFF') removed.set(t.id, consumed);
+      if (t.transactionType === 'SALE' && inPeriod) {
+        for (const lot of consumed) {
+          for (let i = 0; i < lot.quantity; i++) {
+            const receivedDate = uncertain ? null : lot.date;
+            soldUnits.push({ status: 'Sold', receivedDate, soldDate: date,
+              daysOnShelf: receivedDate ? Math.max(0, Math.floor((Date.parse(date) - Date.parse(receivedDate)) / DAY)) : null });
+          }
+        }
+      }
     } else if (t.transactionType === 'REVERT_WRITE_OFF') {
       const original = t.revertedFromId === null ? [] : (removed.get(t.revertedFromId) ?? []);
       let remaining = t.quantity;
@@ -85,7 +102,21 @@ export function buildRepRow(product: RepProduct, brand: string, start: string, e
   const oldest = remainingLots.map(lot => lot.date).sort()[0];
   const known = product.currentQty > 0 && matchesStock && !uncertain && remainingLots.every(lot => lot.date !== null) && oldest;
   const daysOnShelf = known ? Math.max(0, Math.floor((Date.parse(asOf) - Date.parse(oldest)) / DAY)) : null;
+  const stockUnits: RepUnit[] = [];
+  if (known) {
+    for (const lot of remainingLots) {
+      for (let i = 0; i < lot.quantity; i++) {
+        stockUnits.push({ status: 'In stock', receivedDate: lot.date, soldDate: null,
+          daysOnShelf: Math.max(0, Math.floor((Date.parse(asOf) - Date.parse(lot.date!)) / DAY)) });
+      }
+    }
+  } else {
+    for (let i = 0; i < product.currentQty; i++) {
+      stockUnits.push({ status: 'In stock', receivedDate: null, soldDate: null, daysOnShelf: null });
+    }
+  }
   return {
+    units: [...stockUnits, ...soldUnits],
     frameId: product.compositeId, brand, model: product.styleNumber, color: product.colorCode,
     size: product.eyeSize, currentQty: product.currentQty, received, sold, lastReceived, lastSold,
     daysOnShelf,
