@@ -108,8 +108,9 @@ export default function SalesRepReportPage() {
             <td className="p-2 whitespace-nowrap"><span className={row.daysOnShelf !== null && row.daysOnShelf >= 90 ? 'rounded bg-amber-100 px-2 py-1 text-amber-900' : ''}>{row.ageBand}</span></td>
             <td className="p-2 whitespace-nowrap">{displayDate(row.lastReceived)}</td><td className="p-2 whitespace-nowrap">{displayDate(row.lastSold)}</td>
           </tr>
-          {(row.currentQty > 1 || row.sold > 0) && <tr className={index % 2 === 0 ? 'bg-gray-50' : ''}><td colSpan={11} className="px-4 pb-4">
-            <div className="border-l-2 border-sky-300 pl-3">
+          {row.currentQty > 1 && <tr className={index % 2 === 0 ? 'bg-gray-50' : ''}><td colSpan={11} className="px-4 pb-4">
+            <details className="border-l-2 border-sky-300 pl-3">
+              <summary className="cursor-pointer py-2 text-xs font-semibold">View unit details</summary>
               <table className="text-xs w-full max-w-2xl"><thead><tr>{['Unit', 'Status', 'Received', 'Sold', 'Days on shelf / before sale'].map(label => <th scope="col" key={label} className="px-2 py-1 text-left">{label}</th>)}</tr></thead>
                 <tbody>{row.units.map((unit, unitIndex) => <tr key={unitIndex}>
                   <td className="px-2 py-1">{unitIndex + 1}</td><td className="px-2 py-1">{unit.status}</td>
@@ -117,7 +118,7 @@ export default function SalesRepReportPage() {
                   <td className="px-2 py-1 font-semibold">{unit.daysOnShelf ?? 'Unknown'}{unit.daysOnShelf !== null ? ' days' : ''}</td>
                 </tr>)}</tbody>
               </table>
-            </div>
+            </details>
           </td></tr>}
           </Fragment>)}</tbody></table></div>}
       </Card>
