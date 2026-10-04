@@ -40,7 +40,7 @@ export default function SalesRepReportPage() {
     event.preventDefault();
     setLoading(true); setReport(null); setError(null);
     try {
-      const params = new URLSearchParams({ brandId, startDate, endDate });
+      const params = new URLSearchParams({ brandId, startDate, endDate, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone });
       const response = await fetch(`/api/reports/sales-rep?${params}`, { cache: 'no-store' });
       const data = await response.json();
       if (!response.ok || !data.success) throw new Error(data.error || 'Unable to generate report.');

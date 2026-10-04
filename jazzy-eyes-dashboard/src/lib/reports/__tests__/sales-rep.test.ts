@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildRepRow, parseReportDate, selectRepRows, type RepTransaction } from '../sales-rep';
+import { buildRepRow, parseReportDate, reportToday, selectRepRows, type RepTransaction } from '../sales-rep';
 const t = (id: number, type: string, date: string, quantity = 1, extra = {}): RepTransaction => ({ id, transactionType: type, transactionDate: new Date(date), quantity, status: 'completed', revertedFromId: null, ...extra });
 const row = (transactions: RepTransaction[], qty = 1, model = '100') => buildRepRow({ compositeId: `1-${model}-001-52`, brandId: 1, styleNumber: model, colorCode: '001', eyeSize: '52', currentQty: qty, transactions }, 'Gucci', '2026-09-01', '2026-09-30', '2026-10-03');
 describe('sales rep report', () => {
@@ -61,6 +61,18 @@ describe('sales rep report', () => {
       { status: 'In stock', receivedDate: null, soldDate: null, daysOnShelf: null },
       { status: 'In stock', receivedDate: null, soldDate: null, daysOnShelf: null },
     ]);
+  });
+  it('uses the viewer calendar for today without shifting stored receipt dates', () => {
+    const now = new Date('2026-10-04T00:30:00Z');
+    expect(reportToday(now, 'America/Los_Angeles')).toBe('2026-10-03');
+    expect(reportToday(now, 'America/New_York')).toBe('2026-10-03');
+    expect(reportToday(now, 'UTC')).toBe('2026-10-04');
+    expect(parseReportDate('2026-03-31')?.toISOString()).toBe('2026-03-31T00:00:00.000Z');
+  });
+  it('handles calendar dates through daylight saving changes and rejects invalid zones', () => {
+    expect(reportToday(new Date('2026-11-01T08:30:00Z'), 'America/Los_Angeles')).toBe('2026-11-01');
+    expect(reportToday(new Date('2026-11-01T09:30:00Z'), 'America/Los_Angeles')).toBe('2026-11-01');
+    expect(() => reportToday(new Date(), 'Not/AZone')).toThrow();
   });
   it('validates date-only inputs including impossible dates', () => {
     for (const input of [null, '', '2026-02-30', '2026-13-01', '2026-1-01', 'invalid']) expect(parseReportDate(input)).toBeNull();

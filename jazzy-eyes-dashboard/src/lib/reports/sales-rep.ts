@@ -35,6 +35,11 @@ export type RepReport = {
   brandName: string; startDate: string; endDate: string;
   asOf: string; frames: RepRow[];
 };
+export function reportToday(now: Date, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now);
+  const part = (type: string) => parts.find(value => value.type === type)!.value;
+  return `${part('year')}-${part('month')}-${part('day')}`;
+}
 export function parseReportDate(value: string | null): Date | null {
   if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
   const date = new Date(`${value}T00:00:00.000Z`);
