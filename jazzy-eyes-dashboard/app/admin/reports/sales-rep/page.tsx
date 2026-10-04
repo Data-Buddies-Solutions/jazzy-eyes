@@ -110,7 +110,6 @@ export default function SalesRepReportPage() {
           </tr>
           {(row.currentQty > 1 || row.sold > 0) && <tr className={index % 2 === 0 ? 'bg-gray-50' : ''}><td colSpan={11} className="px-4 pb-4">
             <div className="border-l-2 border-sky-300 pl-3">
-              <p className="text-xs font-semibold py-2">Unit breakdown · current stock and sales in the selected period</p>
               <table className="text-xs w-full max-w-2xl"><thead><tr>{['Unit', 'Status', 'Received', 'Sold', 'Days on shelf / before sale'].map(label => <th scope="col" key={label} className="px-2 py-1 text-left">{label}</th>)}</tr></thead>
                 <tbody>{row.units.map((unit, unitIndex) => <tr key={unitIndex}>
                   <td className="px-2 py-1">{unitIndex + 1}</td><td className="px-2 py-1">{unit.status}</td>
