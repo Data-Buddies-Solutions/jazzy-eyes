@@ -100,7 +100,6 @@ export interface SearchFilters {
   status: 'All' | 'Active' | 'Sold Out' | 'Discontinued' | 'Returned';
 }
 
-// Brand Management Types
 export interface BrandWithDetails extends Brand {
   allocationQuantity: number;
   companyId: number;
@@ -139,7 +138,6 @@ export interface UpdateCompanyData {
   companyName: string;
 }
 
-// Frame Status Management Types
 export interface FrameStatus {
   id: number;
   name: string;

@@ -18,7 +18,6 @@ export async function GET(request: NextRequest) {
     const startDate = new Date(startDateStr);
     const endDate = new Date(endDateStr);
 
-    // Get all SALE transactions in the date range with their products (inventory sales)
     const saleTransactions = await prisma.inventoryTransaction.findMany({
       where: {
         transactionType: 'SALE',
@@ -49,7 +48,6 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Get all RX sales in the date range
     const rxSales = await prisma.rxSale.findMany({
       where: {
         saleDate: {
@@ -66,7 +64,6 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Calculate margins by brand
     const brandMarginMap = new Map<
       string,
       {
@@ -76,7 +73,6 @@ export async function GET(request: NextRequest) {
       }
     >();
 
-    // Calculate margins by product type
     const productTypeMarginMap = new Map<
       string,
       {
@@ -85,17 +81,14 @@ export async function GET(request: NextRequest) {
       }
     >();
 
-    // Process inventory sale transactions
     saleTransactions.forEach((saleTransaction) => {
       const brandName = saleTransaction.product.brand.brandName;
       const brand = saleTransaction.product.brand;
 
       const revenue = Number(saleTransaction.unitPrice);
-      // Use SALE transaction's unitCost (includes FIFO + brand discount), fallback to ORDER cost for older records
       let cost = Number(saleTransaction.unitCost);
       if (cost === 0 && saleTransaction.product.transactions.length > 0) {
         cost = Number(saleTransaction.product.transactions[0].unitCost);
-        // Apply brand discount to fallback cost for sales on/after discount start date
         if (
           brand.costDiscountPercent &&
           Number(brand.costDiscountPercent) > 0 &&
@@ -106,7 +99,6 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // By brand
       if (!brandMarginMap.has(brandName)) {
         brandMarginMap.set(brandName, {
           totalRevenue: 0,
@@ -120,7 +112,6 @@ export async function GET(request: NextRequest) {
       brandData.totalCost += cost;
       brandData.unitsSold += 1;
 
-      // By product type
       const productType = saleTransaction.product.productType;
       if (!productTypeMarginMap.has(productType)) {
         productTypeMarginMap.set(productType, {
@@ -134,16 +125,13 @@ export async function GET(request: NextRequest) {
       productTypeData.cost += cost;
     });
 
-    // Process RX sales (include if they have cost data)
     rxSales.forEach((rx) => {
       const brandName = rx.brand.brandName;
       const revenue = Number(rx.salePrice);
       const cost = Number(rx.costPrice);
 
-      // Only include in margin calculations if we have cost data
       if (cost <= 0) return;
 
-      // By brand
       if (!brandMarginMap.has(brandName)) {
         brandMarginMap.set(brandName, {
           totalRevenue: 0,
@@ -157,7 +145,6 @@ export async function GET(request: NextRequest) {
       brandData.totalCost += cost;
       brandData.unitsSold += 1;
 
-      // By product type (RX sales have productType field)
       const productType = rx.productType;
       if (!productTypeMarginMap.has(productType)) {
         productTypeMarginMap.set(productType, {
@@ -171,8 +158,6 @@ export async function GET(request: NextRequest) {
       productTypeData.cost += cost;
     });
 
-    // Analytics shows vendor credits generated in the selected window only.
-    // Full credit balances and application belong in the EOM report.
     const returnWriteOffs = await prisma.inventoryTransaction.findMany({
       where: {
         transactionType: 'WRITE_OFF',
@@ -225,7 +210,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Format by brand
     const byBrand = Array.from(brandMarginMap.entries())
       .map(([brandName, data]) => {
         const grossProfit = data.totalRevenue - data.totalCost;
@@ -249,7 +233,6 @@ export async function GET(request: NextRequest) {
       })
       .sort((a, b) => b.marginPercent - a.marginPercent);
 
-    // Also surface brands that have credits but no sales in window
     for (const [brandName, returnCredits] of returnCreditsByBrand) {
       if (byBrand.find((b) => b.brandName === brandName)) continue;
       if (returnCredits === 0) continue;
@@ -265,7 +248,6 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Format by product type
     const byProductType = Array.from(productTypeMarginMap.entries()).map(
       ([productType, data]) => {
         const profit = data.revenue - data.cost;
@@ -280,7 +262,6 @@ export async function GET(request: NextRequest) {
       }
     );
 
-    // Calculate overall metrics
     const totalRevenue = byBrand.reduce((sum, b) => sum + b.totalRevenue, 0);
     const totalProfit = byBrand.reduce((sum, b) => sum + b.grossProfit, 0);
     const avgMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;

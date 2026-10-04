@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest';
 
-/**
- * Tests for EOM report parameter validation logic
- * Mirrors the validation in /api/reports/eom/route.ts
- */
 
 function validateEOMParams(yearStr: string | null, monthStr: string | null): { valid: boolean; error?: string; year?: number; month?: number } {
   const year = parseInt(yearStr || new Date().getFullYear().toString(), 10);
@@ -61,10 +57,6 @@ describe('EOM report parameter validation', () => {
   });
 });
 
-/**
- * Tests for below-cost sale validation logic
- * Mirrors the check in /api/frames/[id]/route.ts
- */
 
 function isBelowCost(salePrice: number, wholesaleCost: number): boolean {
   return wholesaleCost > 0 && salePrice < wholesaleCost;
@@ -93,10 +85,6 @@ describe('below-cost sale validation', () => {
   });
 });
 
-/**
- * Tests for FIFO cost calculation logic
- * Mirrors previewFIFOCost in /api/frames/[id]/route.ts
- */
 
 interface Batch {
   remainingQty: number;
@@ -129,16 +117,14 @@ describe('FIFO cost calculation', () => {
       { remainingQty: 2, unitCost: 40 },
       { remainingQty: 3, unitCost: 60 },
     ];
-    // Consume 4: 2 @ $40 + 2 @ $60 = $80 + $120 = $200 / 4 = $50
     expect(calculateFIFOCost(batches, 4)).toBe(50);
   });
 
   it('uses oldest batches first (FIFO order)', () => {
     const batches: Batch[] = [
-      { remainingQty: 5, unitCost: 30 }, // oldest
-      { remainingQty: 5, unitCost: 50 }, // newer
+      { remainingQty: 5, unitCost: 30 },
+      { remainingQty: 5, unitCost: 50 },
     ];
-    // Consume 3: all from first batch @ $30
     expect(calculateFIFOCost(batches, 3)).toBe(30);
   });
 
@@ -156,7 +142,6 @@ describe('FIFO cost calculation', () => {
       { remainingQty: 2, unitCost: 100 },
       { remainingQty: 3, unitCost: 200 },
     ];
-    // (2*100 + 3*200) / 5 = 800/5 = 160
     expect(calculateFIFOCost(batches, 5)).toBe(160);
   });
 });

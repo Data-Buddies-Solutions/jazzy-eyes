@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { frameFormSchema } from '@/lib/validations/admin';
 
-// Generate compositeId in format: {brandId}-{styleNumber}-{colorCode}-{eyeSize}
 function generateCompositeId(
   brandId: number,
   styleNumber: string,
@@ -16,7 +15,6 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    // Validate input
     const validationResult = frameFormSchema.safeParse(body);
     if (!validationResult.success) {
       return NextResponse.json(
@@ -31,7 +29,6 @@ export async function POST(request: NextRequest) {
 
     const data = validationResult.data;
 
-    // Generate compositeId
     const compositeId = generateCompositeId(
       data.brandId,
       data.styleNumber,
@@ -39,7 +36,6 @@ export async function POST(request: NextRequest) {
       data.eyeSize
     );
 
-    // Verify brand exists
     const brand = await prisma.brand.findUnique({
       where: { id: data.brandId },
     });
@@ -51,7 +47,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check for duplicate compositeId
     const existingProduct = await prisma.product.findUnique({
       where: { compositeId },
     });
@@ -66,14 +61,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get Active status for new frames
     const activeStatus = await prisma.frameStatus.findUnique({
       where: { name: 'Active' },
     });
 
-    // Create Product + InventoryTransaction in a transaction
     const result = await prisma.$transaction(async (tx) => {
-      // Create Product record
       const product = await tx.product.create({
         data: {
           compositeId,
@@ -88,8 +80,6 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // Create InventoryTransaction (ORDER type)
-      // Use invoice date for transaction date if provided (for backlog entries)
       const invoiceDate = data.invoiceDate ? new Date(data.invoiceDate) : null;
       const transactionDate = invoiceDate || new Date();
 

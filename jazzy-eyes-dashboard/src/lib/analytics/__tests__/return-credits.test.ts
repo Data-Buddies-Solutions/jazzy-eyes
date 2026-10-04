@@ -28,7 +28,7 @@ describe('calculateReturnCreditSummaries (window-scoped)', () => {
     const [g] = calculateReturnCreditSummaries(events, d('2026-01-01'), d('2026-01-31'));
     expect(g.startingCreditBalance).toBe(0);
     expect(g.returnCredits).toBe(100);
-    expect(g.creditsApplied).toBe(100); // applies retroactively to total COGS of 140
+    expect(g.creditsApplied).toBe(100);
     expect(g.endingCreditBalance).toBe(0);
   });
 
@@ -91,9 +91,6 @@ describe('calculateReturnCreditSummaries (window-scoped)', () => {
   });
 
   it('endings chain to next period startings (Fendi-style)', () => {
-    // Pre-period: COGS $1000, no credits → $1000 deficit
-    // March: COGS $50, RC $189 (credits beat cogs by $139)
-    // April: COGS $200, no new credits
     const events: CreditLedgerEvent[] = [
       { brandName: 'Fendi', date: d('2026-02-10'), type: 'COST', amount: 1000 },
       { brandName: 'Fendi', date: d('2026-03-10'), type: 'COST', amount: 50 },
@@ -103,11 +100,9 @@ describe('calculateReturnCreditSummaries (window-scoped)', () => {
     const [march] = calculateReturnCreditSummaries(events, d('2026-03-01'), d('2026-03-31'));
     const [april] = calculateReturnCreditSummaries(events, d('2026-04-01'), d('2026-04-30'));
 
-    // March identity
     expect(march.startingCreditBalance + march.returnCredits).toBe(
       march.creditsApplied + march.endingCreditBalance
     );
-    // Chain: March ending == April starting
     expect(april.startingCreditBalance).toBe(march.endingCreditBalance);
   });
 

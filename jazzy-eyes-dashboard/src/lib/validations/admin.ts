@@ -70,7 +70,6 @@ export type WriteOffData = z.infer<typeof writeOffSchema>;
 export type RevertWriteOffData = z.infer<typeof revertWriteOffSchema>;
 export type RestockData = z.infer<typeof restockSchema>;
 
-// Brand Management Validation Schemas
 export const createCompanySchema = z.object({
   companyName: z
     .string()
@@ -127,7 +126,6 @@ export type CreateBrandData = z.infer<typeof createBrandSchema>;
 export type UpdateBrandData = z.infer<typeof updateBrandSchema>;
 export type UpdateCompanyData = z.infer<typeof updateCompanySchema>;
 
-// Frame Status Management Validation Schemas
 export const createStatusSchema = z.object({
   name: z
     .string()

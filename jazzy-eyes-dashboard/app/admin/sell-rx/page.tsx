@@ -249,7 +249,6 @@ export default function SellPrescriptionPage() {
       <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-5">
         <Card className="p-5 border-2 border-black">
           <div className="space-y-5">
-            {/* Brand */}
             <div className="space-y-2">
               <Label htmlFor="brandId">
                 Brand <span className="text-red-500">*</span>
@@ -280,7 +279,6 @@ export default function SellPrescriptionPage() {
               )}
             </div>
 
-            {/* Style Number */}
             <div className="space-y-2">
               <Label htmlFor="styleNumber">
                 Style Number <span className="text-red-500">*</span>
@@ -296,7 +294,6 @@ export default function SellPrescriptionPage() {
               )}
             </div>
 
-            {/* Color Code */}
             <div className="space-y-2">
               <Label htmlFor="colorCode">
                 Color Code <span className="text-red-500">*</span>
@@ -312,7 +309,6 @@ export default function SellPrescriptionPage() {
               )}
             </div>
 
-            {/* Eye Size */}
             <div className="space-y-2">
               <Label htmlFor="eyeSize">
                 Eye Size <span className="text-red-500">*</span>
@@ -328,7 +324,6 @@ export default function SellPrescriptionPage() {
               )}
             </div>
 
-            {/* Gender */}
             <div className="space-y-2">
               <Label>Gender</Label>
               <RadioGroup
@@ -359,7 +354,6 @@ export default function SellPrescriptionPage() {
               </RadioGroup>
             </div>
 
-            {/* Frame Type */}
             <div className="space-y-2">
               <Label>Frame Type</Label>
               <RadioGroup
@@ -402,7 +396,6 @@ export default function SellPrescriptionPage() {
               </RadioGroup>
             </div>
 
-            {/* Product Type */}
             <div className="space-y-2">
               <Label>Product Type</Label>
               <RadioGroup
@@ -427,7 +420,6 @@ export default function SellPrescriptionPage() {
               </RadioGroup>
             </div>
 
-            {/* Sale Date */}
             <div className="space-y-2">
               <Label htmlFor="saleDate">Sale Date</Label>
               <Input
@@ -438,7 +430,6 @@ export default function SellPrescriptionPage() {
               />
             </div>
 
-            {/* Prices */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label htmlFor="salePrice">
@@ -480,7 +471,6 @@ export default function SellPrescriptionPage() {
               </div>
             </div>
 
-            {/* Notes */}
             <div className="space-y-2">
               <Label htmlFor="notes">Notes (Optional)</Label>
               <Input
@@ -493,7 +483,6 @@ export default function SellPrescriptionPage() {
           </div>
         </Card>
 
-        {/* Submit Button */}
         <div className="flex justify-end">
           <Button
             type="submit"
@@ -512,7 +501,6 @@ export default function SellPrescriptionPage() {
         </div>
       </form>
 
-      {/* Confirmation Dialog */}
       <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
         <AlertDialogContent className="border-2 border-black">
           <AlertDialogHeader>

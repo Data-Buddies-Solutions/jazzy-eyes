@@ -11,12 +11,9 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="bg-white flex min-h-screen">
-      {/* Sidebar */}
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Header */}
         <header className="border-b-2 border-black px-4 py-4">
           <div className="flex items-center justify-between">
             <h1 className="text-xl font-bold">Admin Portal</h1>
@@ -30,7 +27,6 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        {/* Page Content */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto">
           {children}
         </main>

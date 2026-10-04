@@ -31,13 +31,11 @@ export function StatusManagementModal({
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Modal states
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [deleteConfirmModalOpen, setDeleteConfirmModalOpen] = useState(false);
 
-  // Selected data
   const [selectedStatus, setSelectedStatus] = useState<FrameStatus | null>(null);
   const [pendingUpdate, setPendingUpdate] = useState<any>(null);
   const [confirmMessage, setConfirmMessage] = useState('');
@@ -254,7 +252,6 @@ export function StatusManagementModal({
             </div>
           </DialogHeader>
 
-          {/* Error Alert */}
           {error && (
             <Alert className="border-2 border-red-500 bg-red-50">
               <AlertCircle className="h-4 w-4 text-red-600" />
@@ -262,7 +259,6 @@ export function StatusManagementModal({
             </Alert>
           )}
 
-          {/* Status List */}
           <div className="space-y-3">
             {isLoading ? (
               <div className="flex justify-center items-center py-12">
@@ -319,7 +315,6 @@ export function StatusManagementModal({
         </DialogContent>
       </Dialog>
 
-      {/* Add Status Modal */}
       <Dialog open={addModalOpen} onOpenChange={setAddModalOpen}>
         <DialogContent className="border-2 border-black">
           <DialogTitle>Add New Status</DialogTitle>
@@ -332,7 +327,6 @@ export function StatusManagementModal({
         </DialogContent>
       </Dialog>
 
-      {/* Edit Status Modal */}
       <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
         <DialogContent className="border-2 border-black">
           <DialogTitle>Edit Status</DialogTitle>
@@ -351,7 +345,6 @@ export function StatusManagementModal({
         </DialogContent>
       </Dialog>
 
-      {/* Confirmation Modal - Update */}
       <ConfirmationModal
         open={confirmModalOpen}
         onOpenChange={setConfirmModalOpen}
@@ -361,7 +354,6 @@ export function StatusManagementModal({
         isLoading={isSaving}
       />
 
-      {/* Confirmation Modal - Delete */}
       <ConfirmationModal
         open={deleteConfirmModalOpen}
         onOpenChange={setDeleteConfirmModalOpen}

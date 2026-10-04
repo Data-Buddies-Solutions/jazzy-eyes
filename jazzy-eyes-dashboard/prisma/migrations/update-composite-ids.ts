@@ -45,7 +45,6 @@ async function main() {
 
     try {
       await prisma.$transaction(async (tx) => {
-        // 1. Create new product with the correct composite ID
         await tx.product.create({
           data: {
             compositeId: expectedId,
@@ -62,13 +61,11 @@ async function main() {
           },
         });
 
-        // 2. Update all inventory transactions to point to the new ID
         await tx.inventoryTransaction.updateMany({
           where: { productId: product.compositeId },
           data: { productId: expectedId },
         });
 
-        // 3. Delete the old product record
         await tx.product.delete({
           where: { compositeId: product.compositeId },
         });

@@ -47,7 +47,6 @@ export async function POST(request: Request) {
 
     const { name, colorScheme } = validation.data;
 
-    // Check if status name already exists
     const existingStatus = await prisma.frameStatus.findUnique({
       where: { name },
     });
@@ -59,7 +58,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Get max display order
     const maxOrder = await prisma.frameStatus.findFirst({
       orderBy: { displayOrder: 'desc' },
       select: { displayOrder: true },

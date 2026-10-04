@@ -39,7 +39,6 @@ export default function AddNewFramePage() {
         throw new Error(result.error || 'Failed to add frame');
       }
 
-      // Fetch brand name for display
       const brandResponse = await fetch('/api/brands');
       const brandData = await brandResponse.json();
       const brand = brandData.brands?.find((b: Brand) => b.id === data.brandId);

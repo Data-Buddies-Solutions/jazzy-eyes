@@ -20,9 +20,7 @@ import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2 } from 'lucide-react';
 
-// Pricing rules by brand name
 const PRICING_RULES: Record<string, { type: 'multiplier' | 'flat'; value: number; round?: boolean }> = {
-  // 2.9x rounded to nearest 5
   'YSL': { type: 'multiplier', value: 2.9, round: true },
   'Chloe': { type: 'multiplier', value: 2.9, round: true },
   'Gucci': { type: 'multiplier', value: 2.9, round: true },
@@ -43,9 +41,7 @@ const PRICING_RULES: Record<string, { type: 'multiplier' | 'flat'; value: number
   'Faniel': { type: 'multiplier', value: 2.9, round: true },
   'Persol': { type: 'multiplier', value: 2.9, round: true },
   'Valentino': { type: 'multiplier', value: 2.9, round: true },
-  // 2x flat (no rounding)
   'Maui Jim': { type: 'multiplier', value: 2, round: false },
-  // $250 flat price
   'Café': { type: 'flat', value: 250 },
   'NRG': { type: 'flat', value: 250 },
   'CLD': { type: 'flat', value: 250 },
@@ -54,12 +50,10 @@ const PRICING_RULES: Record<string, { type: 'multiplier' | 'flat'; value: number
   'Konishi': { type: 'flat', value: 250 },
 };
 
-// Round to nearest 5
 function roundToNearest5(value: number): number {
   return Math.round(value / 5) * 5;
 }
 
-// Calculate retail price based on brand and cost
 function calculateRetailPrice(brandName: string, costPrice: number): number | null {
   const rule = PRICING_RULES[brandName];
   if (!rule || costPrice <= 0) return null;
@@ -119,7 +113,6 @@ export function FrameForm({
   const watchedBrandId = watch('brandId');
   const watchedCostPrice = watch('costPrice');
 
-  // Auto-calculate retail price when brand or cost changes
   useEffect(() => {
     if (!watchedBrandId || !watchedCostPrice || watchedCostPrice <= 0) return;
 
@@ -132,7 +125,6 @@ export function FrameForm({
     }
   }, [watchedBrandId, watchedCostPrice, brands, setValue]);
 
-  // Fetch brands from API
   useEffect(() => {
     async function fetchBrands() {
       try {
@@ -151,7 +143,6 @@ export function FrameForm({
   }, []);
 
   const handleFormSubmit = (data: any) => {
-    // Ensure brandId is number and prices are numbers
     const formData = {
       ...data,
       brandId: parseInt(data.brandId, 10),
@@ -165,7 +156,6 @@ export function FrameForm({
     <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-5">
       <Card className="p-5 border-2 border-black">
         <div className="space-y-5">
-          {/* Brand */}
           <div className="space-y-2">
             <Label htmlFor="brandId">
               Brand <span className="text-red-500">*</span>
@@ -197,7 +187,6 @@ export function FrameForm({
             )}
           </div>
 
-          {/* Style Number */}
           <div className="space-y-2">
             <Label htmlFor="styleNumber">
               Style Number <span className="text-red-500">*</span>
@@ -213,7 +202,6 @@ export function FrameForm({
             )}
           </div>
 
-          {/* Color Code */}
           <div className="space-y-2">
             <Label htmlFor="colorCode">
               Color Code <span className="text-red-500">*</span>
@@ -229,7 +217,6 @@ export function FrameForm({
             )}
           </div>
 
-          {/* Eye Size */}
           <div className="space-y-2">
             <Label htmlFor="eyeSize">
               Eye Size <span className="text-red-500">*</span>
@@ -245,7 +232,6 @@ export function FrameForm({
             )}
           </div>
 
-          {/* Gender */}
           <div className="space-y-2">
             <Label>
               Gender <span className="text-red-500">*</span>
@@ -281,7 +267,6 @@ export function FrameForm({
             )}
           </div>
 
-          {/* Frame Type */}
           <div className="space-y-2">
             <Label>
               Frame Type <span className="text-red-500">*</span>
@@ -329,7 +314,6 @@ export function FrameForm({
             )}
           </div>
 
-          {/* Product Type */}
           <div className="space-y-2">
             <Label>
               Product Type <span className="text-red-500">*</span>
@@ -362,7 +346,6 @@ export function FrameForm({
             )}
           </div>
 
-          {/* Invoice Date */}
           <div className="space-y-2">
             <Label htmlFor="invoiceDate">
               Invoice Date
@@ -378,7 +361,6 @@ export function FrameForm({
             )}
           </div>
 
-          {/* Prices */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <Label htmlFor="costPrice">
@@ -427,7 +409,6 @@ export function FrameForm({
             </div>
           </div>
 
-          {/* Notes */}
           <div className="space-y-2">
             <Label htmlFor="notes">Notes (Optional)</Label>
             <Input
@@ -441,7 +422,6 @@ export function FrameForm({
             )}
           </div>
 
-          {/* Special Order */}
           <div className="flex items-center space-x-2 pt-2">
             <Checkbox
               id="isSpecialOrder"
@@ -456,7 +436,6 @@ export function FrameForm({
         </div>
       </Card>
 
-      {/* Submit Button */}
       <div className="flex justify-end">
         <Button
           type="submit"

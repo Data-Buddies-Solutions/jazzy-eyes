@@ -51,7 +51,6 @@ export function BrandForm({
   return (
     <Card className="border-2 border-black p-6">
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        {/* Company Name (read-only in create mode) */}
         {mode === 'create' && companyName && (
           <div className="space-y-2">
             <Label>Company</Label>
@@ -63,7 +62,6 @@ export function BrandForm({
           </div>
         )}
 
-        {/* Brand Name */}
         <div className="space-y-2">
           <Label htmlFor="brandName">Brand Name *</Label>
           <Input
@@ -78,7 +76,6 @@ export function BrandForm({
           )}
         </div>
 
-        {/* Brand ID (create mode) */}
         {mode === 'create' && (
           <div className="space-y-2">
             <Label htmlFor="brandId">Brand ID *</Label>
@@ -99,7 +96,6 @@ export function BrandForm({
           </div>
         )}
 
-        {/* Brand ID (edit mode) */}
         {mode === 'edit' && (
           <div className="space-y-2">
             <Label htmlFor="id">Brand ID *</Label>
@@ -117,7 +113,6 @@ export function BrandForm({
           </div>
         )}
 
-        {/* Allocation Quantity */}
         <div className="space-y-2">
           <Label htmlFor="allocationQuantity">Allocation Quantity *</Label>
           <Input
@@ -137,7 +132,6 @@ export function BrandForm({
           )}
         </div>
 
-        {/* Submit Button */}
         <Button
           type="submit"
           className="w-full bg-sky-deeper hover:bg-sky-deeper/90 text-black font-semibold border-2 border-black"

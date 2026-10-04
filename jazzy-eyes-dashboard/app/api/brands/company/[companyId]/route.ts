@@ -29,7 +29,6 @@ export async function PUT(
 
     const { companyName } = validation.data;
 
-    // Check if company exists
     const existingCompany = await prisma.brand.findFirst({
       where: { companyId },
     });
@@ -41,7 +40,6 @@ export async function PUT(
       );
     }
 
-    // Update all brands with this company ID
     const result = await prisma.brand.updateMany({
       where: { companyId },
       data: { companyName },

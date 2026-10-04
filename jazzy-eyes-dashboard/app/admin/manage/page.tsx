@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -44,7 +44,14 @@ export default function ManageInventoryPage() {
     totalPages: 0,
   });
 
-  const loadFrames = async (query?: string, page: number = 1, status?: StatusFilter, mode?: SearchMode) => {
+  const requestRef = useRef<AbortController | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const loadFrames = useCallback(async (query?: string, page: number = 1, status?: StatusFilter, mode?: SearchMode) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    requestRef.current = controller;
     setIsSearching(true);
     try {
       const currentStatus = status !== undefined ? status : statusFilter;
@@ -57,8 +64,9 @@ export default function ManageInventoryPage() {
         status: currentStatus,
         searchMode: currentMode,
       });
-      const response = await fetch(`/api/frames/search?${params}`);
+      const response = await fetch(`/api/frames/search?${params}`, { signal: controller.signal });
       const data = await response.json();
+      if (controller.signal.aborted) return;
 
       if (data.success) {
         setFrames(data.frames);
@@ -67,28 +75,27 @@ export default function ManageInventoryPage() {
         throw new Error(data.error || 'Failed to load frames');
       }
     } catch (error) {
+      if (controller.signal.aborted) return;
       console.error('Error loading frames:', error);
       toast.error('Failed to load frames. Please try again.');
     } finally {
-      setIsSearching(false);
-      setIsLoading(false);
+      if (!controller.signal.aborted) {
+        setIsSearching(false);
+        setIsLoading(false);
+      }
     }
-  };
-
-  // Debounced live search - reset to page 1 on new search
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      loadFrames(searchQuery, 1, statusFilter, searchMode);
-    }, 300); // 300ms delay after user stops typing
-
-    return () => clearTimeout(timeoutId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, statusFilter, searchMode]);
 
   useEffect(() => {
-    loadFrames();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    requestRef.current?.abort();
+    debounceRef.current = setTimeout(() => {
+      void loadFrames(searchQuery, 1, statusFilter, searchMode);
+    }, 300);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      requestRef.current?.abort();
+    };
+  }, [loadFrames, searchQuery, statusFilter, searchMode]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -105,7 +112,7 @@ export default function ManageInventoryPage() {
 
   const toggleSearchMode = () => {
     setSearchMode((prev) => (prev === 'brand' ? 'color' : 'brand'));
-    setSearchQuery(''); // Clear search when switching modes
+    setSearchQuery('');
   };
 
   const handleEdit = (frame: Frame) => {
@@ -130,9 +137,7 @@ export default function ManageInventoryPage() {
         setEditModalOpen(false);
         setEditingFrame(null);
         await loadFrames(searchQuery, pagination.page, statusFilter);
-        // Show the backend message which includes ID change info
         toast.success(result.message || 'Frame updated successfully!');
-        // If ID changed, also show the new ID
         if (result.newCompositeId) {
           console.log('Frame ID changed to:', result.newCompositeId);
         }
@@ -160,11 +165,9 @@ export default function ManageInventoryPage() {
         </p>
       </div>
 
-      {/* Search */}
       <div className="bg-white border-2 border-black rounded-lg p-6">
         <form onSubmit={handleSearch} className="space-y-4">
           <div className="flex flex-col md:flex-row gap-4">
-            {/* Search Mode Toggle */}
             <Button
               type="button"
               onClick={toggleSearchMode}
@@ -178,7 +181,6 @@ export default function ManageInventoryPage() {
               {searchMode === 'color' ? 'Search by Color' : 'Search by Brand'}
             </Button>
 
-            {/* Search Bar */}
             <div className="flex-1">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -197,7 +199,6 @@ export default function ManageInventoryPage() {
               </div>
             </div>
 
-            {/* Search Button */}
             <Button
               type="submit"
               disabled={isSearching}
@@ -214,7 +215,6 @@ export default function ManageInventoryPage() {
             </Button>
           </div>
 
-          {/* Status Filter */}
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-600 mr-2">Status:</span>
             {(['All', 'Active', 'Sold Out', 'Discontinued', 'Returned'] as StatusFilter[]).map((status) => (
@@ -279,7 +279,6 @@ export default function ManageInventoryPage() {
         </form>
       </div>
 
-      {/* Results Table */}
       {isLoading ? (
         <div className="flex justify-center items-center py-12">
           <Loader2 className="w-8 h-8 animate-spin text-sky-deeper" />
@@ -292,7 +291,6 @@ export default function ManageInventoryPage() {
             onRefresh={handleRefresh}
           />
 
-          {/* Pagination Controls */}
           {pagination.totalPages > 1 && (
             <div className="flex items-center justify-center gap-2 py-4">
               <Button
@@ -307,10 +305,8 @@ export default function ManageInventoryPage() {
               </Button>
 
               <div className="flex items-center gap-1">
-                {/* Show page numbers */}
                 {Array.from({ length: pagination.totalPages }, (_, i) => i + 1)
                   .filter((page) => {
-                    // Show first, last, current, and pages near current
                     return (
                       page === 1 ||
                       page === pagination.totalPages ||
@@ -318,7 +314,6 @@ export default function ManageInventoryPage() {
                     );
                   })
                   .map((page, index, array) => {
-                    // Add ellipsis if there's a gap
                     const showEllipsisBefore =
                       index > 0 && page - array[index - 1] > 1;
                     return (
@@ -359,7 +354,6 @@ export default function ManageInventoryPage() {
         </>
       )}
 
-      {/* Edit Modal */}
       {editingFrame && (
         <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto border-2 border-black">

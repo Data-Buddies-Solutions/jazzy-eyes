@@ -66,7 +66,6 @@ export function StatusForm({
   return (
     <Card className="border-2 border-black p-6">
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        {/* Status Name */}
         <div className="space-y-2">
           <Label htmlFor="name">
             Status Name <span className="text-red-500">*</span>
@@ -83,7 +82,6 @@ export function StatusForm({
           )}
         </div>
 
-        {/* Color Scheme */}
         <div className="space-y-2">
           <Label htmlFor="colorScheme">
             Color Scheme <span className="text-red-500">*</span>
@@ -113,7 +111,6 @@ export function StatusForm({
           )}
         </div>
 
-        {/* Preview */}
         {selectedColor && statusName && (
           <div className="space-y-2">
             <Label>Preview</Label>
@@ -129,7 +126,6 @@ export function StatusForm({
           </div>
         )}
 
-        {/* Submit Button */}
         <Button
           type="submit"
           className="w-full bg-sky-deeper hover:bg-sky-deeper/90 text-black font-semibold border-2 border-black"

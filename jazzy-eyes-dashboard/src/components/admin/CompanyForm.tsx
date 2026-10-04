@@ -35,7 +35,6 @@ export function CompanyForm({
   return (
     <Card className="border-2 border-black p-6">
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        {/* Company Name */}
         <div className="space-y-2">
           <Label htmlFor="companyName">Company Name *</Label>
           <Input
@@ -50,7 +49,6 @@ export function CompanyForm({
           )}
         </div>
 
-        {/* Submit Button */}
         <Button
           type="submit"
           className="w-full bg-sky-deeper hover:bg-sky-deeper/90 text-black font-semibold border-2 border-black"

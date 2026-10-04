@@ -67,9 +67,6 @@ export async function GET(request: NextRequest) {
       : new Date(now.getFullYear(), 0, 1);
     const endDate = endDateStr ? new Date(endDateStr) : now;
 
-    // System inception: 2026-01-08 was the day initial inventory was seeded
-    // (807 ORDER transactions on one day). Anything on/before this counts as
-    // Beginning, not Added — even when looking at the 2026 report.
     const INCEPTION_DATE = new Date('2026-01-08T23:59:59.999Z');
     const beginningBoundary =
       startDate.getTime() > INCEPTION_DATE.getTime()
@@ -97,19 +94,17 @@ export async function GET(request: NextRequest) {
       orderBy: { compositeId: 'asc' },
     });
 
-    // Per-frame flow computation
     const frames = products.map((p) => {
       let beginningQty = 0;
       let added = 0;
       let returned = 0;
       let sold = 0;
-      let otherAdjustments = 0; // damaged/lost/defective write-offs + reverts
+      let otherAdjustments = 0;
 
       for (const t of p.transactions) {
         const beforeWindow = t.transactionDate <= beginningBoundary;
         const inWindow = !beforeWindow && t.transactionDate <= endDate;
 
-        // Signed delta from each transaction type
         let delta = 0;
         let bucket: 'added' | 'returned' | 'sold' | 'other' = 'other';
         switch (t.transactionType) {
@@ -138,7 +133,7 @@ export async function GET(request: NextRequest) {
           if (bucket === 'added') added += t.quantity;
           else if (bucket === 'sold') sold += t.quantity;
           else if (bucket === 'returned') returned += t.quantity;
-          else otherAdjustments += -delta; // positive if subtraction
+          else otherAdjustments += -delta;
         }
       }
 
@@ -173,7 +168,6 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    // Brand-level rollup
     const summary = frames.reduce(
       (acc, f) => ({
         beginningQty: acc.beginningQty + f.beginningQty,
@@ -205,7 +199,6 @@ export async function GET(request: NextRequest) {
       }
     );
 
-    // Special orders (preserved for backwards compat with the page)
     const specialOrders = await prisma.inventoryTransaction.findMany({
       where: {
         isSpecialOrder: true,
