@@ -38,14 +38,11 @@ export type MigrationRefusal =
   | 'gap_in_sequence'
   | 'transaction_control'
   | 'lock_timeout'
-  | 'adopt_required'
-  | 'prisma_drift'
   | 'checksum_mismatch'
   | 'applied_without_file'
   | 'apply_failed'
-  | 'no_prisma_history'
-  | 'prisma_history_unexpected'
-  | 'schema_migrations_not_empty'
+  | 'empty_database'
+  | 'ledger_not_empty'
 
 export class MigrationError extends Error {
   readonly reason: MigrationRefusal
@@ -121,22 +118,6 @@ export async function migrate(
 ): Promise<MigrateResult> {
   return withLockedClient(pool, lockTimeout, async (client) => {
     const applied = (await ledgerExists(client)) ? await appliedMigrations(client) : new Map()
-    const prismaRows = await finishedPrismaMigrations(client)
-    if (applied.size === 0 && prismaRows.length > 0) {
-      throw new MigrationError(
-        'adopt_required',
-        'schema_migrations is empty but _prisma_migrations has applied rows. Run `npx tsx scripts/adopt-prisma-migrations.ts` once against this database first.'
-      )
-    }
-    const appliedSlugs = new Set([...applied.keys()].map(slugOf))
-    for (const row of prismaRows) {
-      if (!appliedSlugs.has(slugOf(row.migration_name))) {
-        throw new MigrationError(
-          'prisma_drift',
-          `${row.migration_name} was applied by prisma migrate deploy but is not in schema_migrations; no schema change may go through Prisma after the cutover`
-        )
-      }
-    }
     await client.query(CREATE_LEDGER)
     const byName = new Map(migrations.map((migration) => [migration.name, migration]))
     for (const [name, checksum] of applied) {
@@ -224,108 +205,55 @@ async function applyMigration(client: PoolClient, migration: Migration): Promise
   }
 }
 
+export type RecordBaselineResult = { recorded: boolean }
+
+export async function recordBaseline(
+  pool: Pool,
+  migrations = loadMigrations()
+): Promise<RecordBaselineResult> {
+  const [baseline] = migrations
+  return withLockedClient(pool, LOCK_TIMEOUT, (client) =>
+    inTransaction(client, async () => {
+      if (!(await hasTables(client))) {
+        throw new MigrationError(
+          'empty_database',
+          `this database has no tables, so ${baseline.name} has not been applied; run migrate instead`
+        )
+      }
+      await client.query(CREATE_LEDGER)
+      const existing = await appliedMigrations(client)
+      if (existing.get(baseline.name) === baseline.checksum) {
+        return { recorded: false }
+      }
+      if (existing.size > 0) {
+        throw new MigrationError(
+          'ledger_not_empty',
+          `schema_migrations already records ${[...existing.keys()].join(', ')}`
+        )
+      }
+      await client.query('INSERT INTO schema_migrations (name, checksum) VALUES ($1, $2)', [
+        baseline.name,
+        baseline.checksum,
+      ])
+      return { recorded: true }
+    })
+  )
+}
+
+export async function recordProductionBaseline(): Promise<RecordBaselineResult> {
+  try {
+    return await recordBaseline(getPool())
+  } finally {
+    await closePool()
+  }
+}
+
 export async function migrateDatabase(): Promise<MigrateResult> {
   try {
     return await migrate(getPool())
   } finally {
     await closePool()
   }
-}
-
-export type AdoptResult = { adopted: string[] }
-
-type PrismaMigrationRow = {
-  id: string
-  migration_name: string
-  checksum: string
-  finished_at: Date | null
-  rolled_back_at: Date | null
-}
-
-export async function adoptPrismaHistory(
-  pool: Pool,
-  migrations = loadMigrations()
-): Promise<AdoptResult> {
-  return withLockedClient(pool, LOCK_TIMEOUT, (client) =>
-    inTransaction(client, async () => {
-      const rows = await prismaMigrations(client)
-      if (!rows) {
-        throw new MigrationError(
-          'no_prisma_history',
-          'this database has no _prisma_migrations table'
-        )
-      }
-      for (const row of rows) {
-        if (!row.finished_at && !row.rolled_back_at) {
-          throw new MigrationError(
-            'prisma_history_unexpected',
-            `${row.migration_name} has a failed attempt that was never resolved; inspect what it applied, then mark it rolled back with UPDATE _prisma_migrations SET rolled_back_at = now() WHERE id = '${row.id}'`
-          )
-        }
-      }
-      const finished = rows.filter(isFinished)
-      if (finished.length === 0) {
-        throw new MigrationError(
-          'no_prisma_history',
-          '_prisma_migrations exists but records no finished migration; a fresh database needs migrate, not adopt'
-        )
-      }
-      const bySlug = new Map(migrations.map((migration) => [slugOf(migration.name), migration]))
-      const adoptions = finished.map((row) => {
-        const file = bySlug.get(slugOf(row.migration_name))
-        if (!file) {
-          throw new MigrationError(
-            'prisma_history_unexpected',
-            `${row.migration_name} has no file in ${MIGRATIONS_DIR}`
-          )
-        }
-        if (file.checksum !== row.checksum) {
-          throw new MigrationError(
-            'checksum_mismatch',
-            `${row.migration_name} was recorded with checksum ${row.checksum} but ${file.name}.sql has ${file.checksum}`
-          )
-        }
-        return { file, appliedAt: row.finished_at }
-      })
-      await client.query(CREATE_LEDGER)
-      const existing = await appliedMigrations(client)
-      if (existing.size > 0) {
-        const alreadyAdopted = adoptions.every(
-          ({ file }) => existing.get(file.name) === file.checksum
-        )
-        if (!alreadyAdopted) {
-          throw new MigrationError(
-            'schema_migrations_not_empty',
-            `schema_migrations already has ${existing.size} rows that are not the Prisma history`
-          )
-        }
-        return { adopted: [] }
-      }
-      for (const { file, appliedAt } of adoptions) {
-        await client.query(
-          'INSERT INTO schema_migrations (name, checksum, applied_at) VALUES ($1, $2, $3)',
-          [file.name, file.checksum, appliedAt]
-        )
-      }
-      return { adopted: adoptions.map(({ file }) => file.name) }
-    })
-  )
-}
-
-export async function adoptPrismaMigrations(): Promise<AdoptResult> {
-  try {
-    return await adoptPrismaHistory(getPool())
-  } finally {
-    await closePool()
-  }
-}
-
-function slugOf(migrationName: string): string {
-  return migrationName.replace(/^\d+_/, '')
-}
-
-function isFinished(row: PrismaMigrationRow): boolean {
-  return row.finished_at !== null && row.rolled_back_at === null
 }
 
 async function appliedMigrations(client: PoolClient): Promise<Map<string, string>> {
@@ -335,22 +263,17 @@ async function appliedMigrations(client: PoolClient): Promise<Map<string, string
   return new Map(rows.map((row) => [row.name, row.checksum]))
 }
 
-async function prismaMigrations(client: PoolClient): Promise<PrismaMigrationRow[] | null> {
-  if (!(await tableExists(client, '_prisma_migrations'))) return null
-  const { rows } = await client.query<PrismaMigrationRow>(
-    'SELECT id, migration_name, checksum, finished_at, rolled_back_at FROM _prisma_migrations ORDER BY migration_name'
-  )
-  return rows
-}
-
-async function finishedPrismaMigrations(client: PoolClient): Promise<PrismaMigrationRow[]> {
-  return ((await prismaMigrations(client)) ?? []).filter(isFinished)
-}
-
 async function tableExists(client: PoolClient, name: string): Promise<boolean> {
   const { rows } = await client.query<{ present: boolean }>(
     'SELECT to_regclass($1) IS NOT NULL AS present',
     [name]
+  )
+  return rows[0].present
+}
+
+async function hasTables(client: PoolClient): Promise<boolean> {
+  const { rows } = await client.query<{ present: boolean }>(
+    "SELECT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'schema_migrations') AS present"
   )
   return rows[0].present
 }

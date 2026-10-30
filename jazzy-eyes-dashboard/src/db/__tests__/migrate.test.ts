@@ -38,19 +38,6 @@ describe('loadMigrations', () => {
     expect(migrations[0].checksum).toBe(checksumOf(migrations[0].sql))
   })
 
-  it('keeps the three Prisma-era files byte for byte, so their checksums match the recorded history', () => {
-    const recorded = Object.fromEntries(
-      loadMigrations(MIGRATIONS_DIR).map((m) => [m.name, m.checksum])
-    )
-    expect(recorded).toMatchObject({
-      '0001_init': 'a86a83f25f44b0593b36abaa781058299f67cc26bc38567ae6b5707a92a86269',
-      '0002_add_invoice_date_to_products':
-        'aab327af49bda353b3ffec1732c30525bfacc578e30d0267c75415da2640d616',
-      '0003_add_is_special_order_to_inventory_transactions':
-        'b045bc78eaebca95daa2d05be1a91c511273e2a98a700d488422da6fa1989312',
-    })
-  })
-
   it('reads files in name order and ignores non-sql files', () => {
     const dir = dirWith({ '0002_b.sql': 'b', '0001_a.sql': 'a', 'notes.txt': 'x' })
     expect(loadMigrations(dir).map((m) => [m.name, m.sql])).toEqual([

@@ -5,8 +5,8 @@ const UTC_MIDNIGHT = new Date('2026-03-05T00:00:00.000Z')
 
 async function insertTransaction(unitCost: string): Promise<number> {
   await getPool().query(
-    `INSERT INTO brands (id, company_name, company_id, brand_name, allocation_quantity, discount_percentage, updated_at)
-     VALUES (1, 'Acme', 10, 'Acme Frames', 5, 0, $1) ON CONFLICT (id) DO NOTHING`,
+    `INSERT INTO brands (id, company_name, company_id, brand_name, allocation_quantity, updated_at)
+     VALUES (1, 'Acme', 10, 'Acme Frames', 5, $1) ON CONFLICT (id) DO NOTHING`,
     [WITH_MILLIS]
   )
   await getPool().query(

@@ -14,8 +14,8 @@ function nextAcquiredClient(): Promise<pg.PoolClient> {
 }
 
 function insertBrand(id: number) {
-  return sql`INSERT INTO brands (id, company_name, company_id, brand_name, allocation_quantity, discount_percentage, updated_at)
-    VALUES (${id}, ${'Acme'}, ${10}, ${`Brand ${id}`}, ${5}, ${0}, now())`
+  return sql`INSERT INTO brands (id, company_name, company_id, brand_name, allocation_quantity, updated_at)
+    VALUES (${id}, ${'Acme'}, ${10}, ${`Brand ${id}`}, ${5}, now())`
 }
 
 const brandId = expression<number>()('id', sql`id`)
