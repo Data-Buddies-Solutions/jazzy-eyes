@@ -176,10 +176,6 @@ export function findStatusByName(name: string): Promise<FrameStatus | null> {
   return db.one(sql`SELECT ${selectAll(frameStatuses)} FROM frame_statuses WHERE name = ${name}`)
 }
 
-export async function brandExists(id: number): Promise<boolean> {
-  return (await db.one(sql`SELECT 1 AS "found" FROM brands WHERE id = ${integer(id, 'brandId')}`)) !== null
-}
-
 // Applies the brand's cost discount when the sale falls on or after the discount's start date.
 export async function discountedCost(brandId: number, cost: number, saleDate: Date): Promise<number> {
   const brand = await db.one(

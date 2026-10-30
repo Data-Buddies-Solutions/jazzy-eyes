@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { brandExists, createFrame, findProduct, findStatusByName, listFrames, transactionJson } from '@/db/frames';
+import { brandExists } from '@/db/brands';
+import { createFrame, findProduct, findStatusByName, listFrames, transactionJson } from '@/db/frames';
 import { frameFormSchema } from '@/lib/validations/admin';
 
 function generateCompositeId(
