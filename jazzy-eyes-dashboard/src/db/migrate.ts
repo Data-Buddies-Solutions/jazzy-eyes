@@ -3,6 +3,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import type { Pool, PoolClient } from 'pg'
 import { closePool, getPool } from './pool'
+import { quote } from './sql'
 
 export const MIGRATIONS_DIR = path.join(import.meta.dirname, 'migrations')
 
@@ -41,7 +42,8 @@ export type MigrationRefusal =
   | 'checksum_mismatch'
   | 'applied_without_file'
   | 'apply_failed'
-  | 'empty_database'
+  | 'baseline_required'
+  | 'schema_mismatch'
   | 'ledger_not_empty'
 
 export class MigrationError extends Error {
@@ -118,6 +120,12 @@ export async function migrate(
 ): Promise<MigrateResult> {
   return withLockedClient(pool, lockTimeout, async (client) => {
     const applied = (await ledgerExists(client)) ? await appliedMigrations(client) : new Map()
+    if (applied.size === 0 && (await hasTables(client))) {
+      throw new MigrationError(
+        'baseline_required',
+        'this database already has tables but schema_migrations records nothing. Run `npx tsx scripts/record-baseline.ts` once against this database first.'
+      )
+    }
     await client.query(CREATE_LEDGER)
     const byName = new Map(migrations.map((migration) => [migration.name, migration]))
     for (const [name, checksum] of applied) {
@@ -205,6 +213,14 @@ async function applyMigration(client: PoolClient, migration: Migration): Promise
   }
 }
 
+export async function migrateDatabase(): Promise<MigrateResult> {
+  try {
+    return await migrate(getPool())
+  } finally {
+    await closePool()
+  }
+}
+
 export type RecordBaselineResult = { recorded: boolean }
 
 export async function recordBaseline(
@@ -214,16 +230,22 @@ export async function recordBaseline(
   const [baseline] = migrations
   return withLockedClient(pool, LOCK_TIMEOUT, (client) =>
     inTransaction(client, async () => {
-      if (!(await hasTables(client))) {
+      const missing = await missingTables(client, tablesCreatedBy(baseline.sql))
+      if (missing.length > 0) {
         throw new MigrationError(
-          'empty_database',
-          `this database has no tables, so ${baseline.name} has not been applied; run migrate instead`
+          'schema_mismatch',
+          `this database lacks ${missing.join(', ')}, which ${baseline.name} creates; record the baseline only on a database that already has its schema`
         )
       }
       await client.query(CREATE_LEDGER)
       const existing = await appliedMigrations(client)
-      if (existing.get(baseline.name) === baseline.checksum) {
-        return { recorded: false }
+      const recorded = existing.get(baseline.name)
+      if (recorded === baseline.checksum) return { recorded: false }
+      if (recorded !== undefined) {
+        throw new MigrationError(
+          'checksum_mismatch',
+          `${baseline.name} was recorded with checksum ${recorded} but the file now has ${baseline.checksum}`
+        )
       }
       if (existing.size > 0) {
         throw new MigrationError(
@@ -243,14 +265,6 @@ export async function recordBaseline(
 export async function recordProductionBaseline(): Promise<RecordBaselineResult> {
   try {
     return await recordBaseline(getPool())
-  } finally {
-    await closePool()
-  }
-}
-
-export async function migrateDatabase(): Promise<MigrateResult> {
-  try {
-    return await migrate(getPool())
   } finally {
     await closePool()
   }
@@ -276,6 +290,18 @@ async function hasTables(client: PoolClient): Promise<boolean> {
     "SELECT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'schema_migrations') AS present"
   )
   return rows[0].present
+}
+
+function tablesCreatedBy(sql: string): string[] {
+  return [...sql.matchAll(/CREATE TABLE (?:public\.)?"?(\w+)"?/gi)].map((match) => match[1])
+}
+
+async function missingTables(client: PoolClient, names: string[]): Promise<string[]> {
+  const missing: string[] = []
+  for (const name of names) {
+    if (!(await tableExists(client, `public.${quote(name)}`))) missing.push(name)
+  }
+  return missing
 }
 
 function ledgerExists(client: PoolClient): Promise<boolean> {

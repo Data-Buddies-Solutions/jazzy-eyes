@@ -238,8 +238,28 @@ describe('recordBaseline', () => {
   })
 
   it('refuses an empty database, which needs migrate', async () => {
-    expect(await refusal(() => recordBaseline(pool, [first]))).toBe('empty_database')
+    expect(await refusal(() => recordBaseline(pool, [first]))).toBe('schema_mismatch')
     expect(await tableExists('schema_migrations')).toBe(false)
+  })
+
+  it('refuses a database that lacks a table the baseline creates', async () => {
+    const baseline = migration(
+      '0001_create_two',
+      'CREATE TABLE things (id text PRIMARY KEY); CREATE TABLE public."Others" (id text)'
+    )
+    await pool.query('CREATE TABLE things (id text PRIMARY KEY)')
+
+    expect(await refusal(() => recordBaseline(pool, [baseline]))).toBe('schema_mismatch')
+    await pool.query('CREATE TABLE "Others" (id text)')
+    expect(await recordBaseline(pool, [baseline])).toEqual({ recorded: true })
+  })
+
+  it('refuses a baseline recorded with a checksum the file no longer has', async () => {
+    await pool.query(first.sql)
+    await recordBaseline(pool, [first])
+    const edited = migration(first.name, `${first.sql};`)
+
+    expect(await refusal(() => recordBaseline(pool, [edited]))).toBe('checksum_mismatch')
   })
 
   it('refuses a ledger that already records something other than the baseline', async () => {
@@ -249,14 +269,14 @@ describe('recordBaseline', () => {
     expect(await refusal(() => recordBaseline(pool, [first, second]))).toBe('ledger_not_empty')
   })
 
-  it('leaves the database unchanged when migrate runs before the baseline is recorded', async () => {
+  it('refuses to migrate a database that has tables but no recorded baseline, and creates no ledger', async () => {
     await pool.query(first.sql)
 
-    expect(await refusal(() => migrate(pool, [first]))).toBe('apply_failed')
-    expect(await ledger()).toEqual([])
+    expect(await refusal(() => migrate(pool, [first]))).toBe('baseline_required')
+    expect(await tableExists('schema_migrations')).toBe(false)
   })
 
-  it('records the real baseline on a copy of the production schema, and migrate then has nothing to do', async () => {
+  it('records the real baseline on a database built from it, and migrate then has nothing to do', async () => {
     const migrations = loadMigrations()
     await pool.query(migrations[0].sql)
 

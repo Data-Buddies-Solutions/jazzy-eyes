@@ -151,7 +151,7 @@ function fakePool(lockError?: Error): { pool: Pool; calls: ClientCall[] } {
     async query(text: string, values?: unknown[]) {
       calls.push({ query: text, values, errorListeners: client.listenerCount('error') })
       if (lockError && text.includes('pg_advisory_lock')) throw lockError
-      return { rows: text.includes('to_regclass') ? [{ present: false }] : [] }
+      return { rows: text.includes('AS present') ? [{ present: false }] : [] }
     },
     release(destroy?: unknown) {
       calls.push({ release: destroy, errorListeners: client.listenerCount('error') })
