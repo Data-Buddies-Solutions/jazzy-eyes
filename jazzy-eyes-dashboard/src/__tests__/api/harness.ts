@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { afterAll, afterEach, beforeEach, vi } from 'vitest'
+import { afterEach, beforeEach, vi } from 'vitest'
 import { getPool } from '@/db/pool'
 
 export const NOW = new Date('2026-10-15T16:00:00.000Z')
@@ -50,12 +50,6 @@ export function useRouteHarness(): void {
 
   afterEach(() => {
     vi.useRealTimers()
-  })
-
-  afterAll(async () => {
-    const leftover = (globalThis as { prisma?: { $disconnect(): Promise<void> } }).prisma
-    await leftover?.$disconnect()
-    await getPool().query('DEALLOCATE ALL')
   })
 }
 
