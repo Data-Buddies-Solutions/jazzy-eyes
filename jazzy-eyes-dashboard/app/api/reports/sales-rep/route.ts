@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { findBrand, repProducts } from '@/db/reports';
 import { buildRepRow, parseReportDate, reportToday, selectRepRows } from '@/lib/reports/sales-rep';
 
 export async function GET(request: NextRequest) {
@@ -20,23 +20,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Invalid report timezone.' }, { status: 400 });
   }
   try {
-    const brand = await prisma.brand.findUnique({
-      where: { id: brandId },
-      select: { id: true, brandName: true },
-    });
+    const brand = await findBrand(brandId);
     if (!brand) return NextResponse.json({ success: false, error: 'Brand not found.' }, { status: 404 });
     const startDate = start.toISOString().slice(0, 10), endDate = end.toISOString().slice(0, 10);
-    const products = await prisma.product.findMany({
-      where: { brandId },
-      select: {
-        compositeId: true, brandId: true, styleNumber: true, colorCode: true, eyeSize: true, currentQty: true,
-        transactions: {
-          where: { status: 'completed', transactionDate: { lte: new Date(`${asOf}T23:59:59.999Z`) } },
-          select: { id: true, transactionType: true, transactionDate: true, quantity: true, status: true, revertedFromId: true },
-          orderBy: [{ transactionDate: 'asc' }, { id: 'asc' }],
-        },
-      },
-    });
+    const products = await repProducts(brandId, new Date(`${asOf}T23:59:59.999Z`));
     const frames = selectRepRows(products.map(product => buildRepRow(product, brand.brandName, startDate, endDate, asOf)));
     return NextResponse.json({ success: true, brandName: brand.brandName, startDate, endDate, asOf, frames },
     { headers: { 'Cache-Control': 'private, no-store' } });

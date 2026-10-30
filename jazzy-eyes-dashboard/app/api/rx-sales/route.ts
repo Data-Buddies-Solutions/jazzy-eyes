@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { countRxSales, createRxSale, findBrandName, listRxSales } from '@/db/rx-sales';
 import { parsePagination, paginationError } from '@/lib/http/pagination';
 
 export async function POST(request: NextRequest) {
@@ -26,38 +26,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const brand = await prisma.brand.findUnique({
-      where: { id: brandId },
-    });
+    const brandName = await findBrandName(brandId);
 
-    if (!brand) {
+    if (brandName === null) {
       return NextResponse.json(
         { success: false, error: 'Brand not found' },
         { status: 404 }
       );
     }
 
-    const rxSale = await prisma.rxSale.create({
-      data: {
-        brandId,
-        styleNumber,
-        colorCode,
-        eyeSize,
-        gender: gender || 'Unisex',
-        frameType: frameType || 'Zyl',
-        productType: productType || 'Optical',
-        saleDate: saleDate ? new Date(saleDate) : new Date(),
-        salePrice,
-        costPrice: costPrice || 0,
-        notes: notes || null,
-      },
-      include: {
-        brand: {
-          select: {
-            brandName: true,
-          },
-        },
-      },
+    const rxSale = await createRxSale({
+      brandId,
+      styleNumber,
+      colorCode,
+      eyeSize,
+      gender: gender || 'Unisex',
+      frameType: frameType || 'Zyl',
+      productType: productType || 'Optical',
+      saleDate: saleDate ? new Date(saleDate) : new Date(),
+      salePrice,
+      costPrice: costPrice || 0,
+      notes: notes || null,
     });
 
     return NextResponse.json({
@@ -65,11 +54,11 @@ export async function POST(request: NextRequest) {
       message: 'RX sale recorded successfully',
       rxSale: {
         id: rxSale.id,
-        brandName: rxSale.brand.brandName,
+        brandName,
         styleNumber: rxSale.styleNumber,
         colorCode: rxSale.colorCode,
         eyeSize: rxSale.eyeSize,
-        salePrice: Number(rxSale.salePrice),
+        salePrice: rxSale.salePrice,
         saleDate: rxSale.saleDate.toISOString(),
       },
     });
@@ -91,24 +80,13 @@ export async function GET(request: NextRequest) {
     }
     const { page, limit, skip } = pagination;
 
-    const totalCount = await prisma.rxSale.count();
+    const totalCount = await countRxSales();
 
-    const rxSales = await prisma.rxSale.findMany({
-      include: {
-        brand: {
-          select: {
-            brandName: true,
-          },
-        },
-      },
-      orderBy: { saleDate: 'desc' },
-      skip,
-      take: limit,
-    });
+    const rxSales = await listRxSales({ skip, limit });
 
     const formattedSales = rxSales.map((sale) => ({
       id: sale.id,
-      brandName: sale.brand.brandName,
+      brandName: sale.brandName,
       styleNumber: sale.styleNumber,
       colorCode: sale.colorCode,
       eyeSize: sale.eyeSize,
@@ -116,8 +94,8 @@ export async function GET(request: NextRequest) {
       frameType: sale.frameType,
       productType: sale.productType,
       saleDate: sale.saleDate.toISOString(),
-      salePrice: Number(sale.salePrice),
-      costPrice: Number(sale.costPrice),
+      salePrice: sale.salePrice,
+      costPrice: sale.costPrice,
       notes: sale.notes,
     }));
 

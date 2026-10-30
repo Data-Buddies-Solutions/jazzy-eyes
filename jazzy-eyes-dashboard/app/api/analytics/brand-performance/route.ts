@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { brandsWithActivity } from '@/db/analytics';
 import type { BrandPerformanceResponse } from '@/types/analytics';
 
 export async function GET(request: NextRequest) {
@@ -18,40 +18,13 @@ export async function GET(request: NextRequest) {
     const startDate = new Date(startDateStr);
     const endDate = new Date(endDateStr);
 
-    const brands = await prisma.brand.findMany({
-      include: {
-        products: {
-          include: {
-            status: true,
-            transactions: {
-              where: {
-                transactionDate: {
-                  gte: startDate,
-                  lte: endDate,
-                },
-              },
-            },
-          },
-        },
-        rxSales: {
-          where: {
-            saleDate: {
-              gte: startDate,
-              lte: endDate,
-            },
-          },
-        },
-      },
-      orderBy: {
-        brandName: 'asc',
-      },
-    });
+    const brands = await brandsWithActivity({ start: startDate, end: endDate });
 
     const brandPerformanceData = brands.map((brand) => {
       const allProducts = brand.products;
 
       const totalInventory = allProducts.filter(
-        (p) => p.status?.name !== 'Sold'
+        (p) => p.statusName !== 'Sold'
       ).length;
 
       const saleTransactions = allProducts.flatMap((p) =>
@@ -65,11 +38,11 @@ export async function GET(request: NextRequest) {
       const totalSold = inventorySold + rxSold;
 
       const inventoryRevenue = saleTransactions.reduce(
-        (sum, t) => sum + Number(t.unitPrice),
+        (sum, t) => sum + t.unitPrice,
         0
       );
       const rxRevenue = rxSales.reduce(
-        (sum, rx) => sum + Number(rx.salePrice),
+        (sum, rx) => sum + rx.salePrice,
         0
       );
       const revenue = inventoryRevenue + rxRevenue;
@@ -80,8 +53,8 @@ export async function GET(request: NextRequest) {
         let marginsCount = 0;
 
         saleTransactions.forEach((saleTransaction) => {
-          const salePrice = Number(saleTransaction.unitPrice);
-          let costPrice = Number(saleTransaction.unitCost);
+          const salePrice = saleTransaction.unitPrice;
+          let costPrice = saleTransaction.unitCost;
           if (costPrice === 0) {
             const product = allProducts.find(
               (p) => p.compositeId === saleTransaction.productId
@@ -90,14 +63,14 @@ export async function GET(request: NextRequest) {
               (t) => t.transactionType === 'ORDER' || t.transactionType === 'RESTOCK'
             );
             if (orderTransaction) {
-              costPrice = Number(orderTransaction.unitCost);
+              costPrice = orderTransaction.unitCost;
               if (
                 brand.costDiscountPercent &&
-                Number(brand.costDiscountPercent) > 0 &&
+                brand.costDiscountPercent > 0 &&
                 brand.costDiscountStartDate &&
                 saleTransaction.transactionDate >= brand.costDiscountStartDate
               ) {
-                costPrice = costPrice * (1 - Number(brand.costDiscountPercent) / 100);
+                costPrice = costPrice * (1 - brand.costDiscountPercent / 100);
               }
             }
           }
@@ -109,8 +82,8 @@ export async function GET(request: NextRequest) {
         });
 
         rxSales.forEach((rx) => {
-          const salePrice = Number(rx.salePrice);
-          const costPrice = Number(rx.costPrice);
+          const salePrice = rx.salePrice;
+          const costPrice = rx.costPrice;
           if (costPrice > 0 && salePrice > 0) {
             const margin = ((salePrice - costPrice) / salePrice) * 100;
             marginsSum += margin;

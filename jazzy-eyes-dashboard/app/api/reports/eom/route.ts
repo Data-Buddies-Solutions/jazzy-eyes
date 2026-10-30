@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { allReturnsEver, allRxSalesEver, allSalesEver, returnsInPeriod, rxSalesInPeriod, salesInPeriod } from '@/db/reports';
 import { calculateReturnCreditSummaries, type CreditLedgerEvent } from '@/lib/analytics/return-credits';
 
 export async function GET(request: NextRequest) {
@@ -18,60 +18,21 @@ export async function GET(request: NextRequest) {
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0, 23, 59, 59, 999);
 
-    const inventorySales = await prisma.inventoryTransaction.findMany({
-      where: {
-        transactionType: 'SALE',
-        transactionDate: {
-          gte: startDate,
-          lte: endDate,
-        },
-      },
-      include: {
-        product: {
-          include: {
-            brand: true,
-            transactions: {
-              where: {
-                transactionType: { in: ['ORDER', 'RESTOCK'] },
-              },
-              orderBy: { transactionDate: 'desc' },
-              take: 1,
-            },
-          },
-        },
-      },
-      orderBy: {
-        transactionDate: 'asc',
-      },
-    });
-
-    const rxSales = await prisma.rxSale.findMany({
-      where: {
-        saleDate: {
-          gte: startDate,
-          lte: endDate,
-        },
-      },
-      include: {
-        brand: true,
-      },
-      orderBy: {
-        saleDate: 'asc',
-      },
-    });
+    const period = { start: startDate, end: endDate };
+    const inventorySales = await salesInPeriod(period);
+    const rxSales = await rxSalesInPeriod(period);
 
     const formattedInventorySales = inventorySales.map((sale) => {
       let unitCost = Number(sale.unitCost);
-      if (unitCost === 0 && sale.product.transactions.length > 0) {
-        unitCost = Number(sale.product.transactions[0].unitCost);
-        const brand = sale.product.brand;
+      if (unitCost === 0 && sale.receivedUnitCost !== null) {
+        unitCost = Number(sale.receivedUnitCost);
         if (
-          brand.costDiscountPercent &&
-          Number(brand.costDiscountPercent) > 0 &&
-          brand.costDiscountStartDate &&
-          sale.transactionDate >= brand.costDiscountStartDate
+          sale.costDiscountPercent &&
+          Number(sale.costDiscountPercent) > 0 &&
+          sale.costDiscountStartDate &&
+          sale.transactionDate >= sale.costDiscountStartDate
         ) {
-          unitCost = unitCost * (1 - Number(brand.costDiscountPercent) / 100);
+          unitCost = unitCost * (1 - Number(sale.costDiscountPercent) / 100);
         }
       }
 
@@ -79,13 +40,13 @@ export async function GET(request: NextRequest) {
         id: sale.id,
         type: 'Inventory' as const,
         date: sale.transactionDate,
-        brandName: sale.product.brand.brandName,
-        styleNumber: sale.product.styleNumber,
-        colorCode: sale.product.colorCode,
-        eyeSize: sale.product.eyeSize,
-        gender: sale.product.gender,
-        frameType: sale.product.frameType,
-        productType: sale.product.productType,
+        brandName: sale.brandName,
+        styleNumber: sale.styleNumber,
+        colorCode: sale.colorCode,
+        eyeSize: sale.eyeSize,
+        gender: sale.gender,
+        frameType: sale.frameType,
+        productType: sale.productType,
         quantity: sale.quantity,
         unitPrice: Number(sale.unitPrice),
         unitCost,
@@ -99,7 +60,7 @@ export async function GET(request: NextRequest) {
       id: sale.id,
       type: 'RX' as const,
       date: sale.saleDate,
-      brandName: sale.brand.brandName,
+      brandName: sale.brandName,
       styleNumber: sale.styleNumber,
       colorCode: sale.colorCode,
       eyeSize: sale.eyeSize,
@@ -144,25 +105,7 @@ export async function GET(request: NextRequest) {
       }))
       .sort((a, b) => b.revenue - a.revenue);
 
-    const returnsInMonth = await prisma.inventoryTransaction.findMany({
-      where: {
-        transactionType: 'WRITE_OFF',
-        writeOffReason: 'return',
-        transactionDate: { gte: startDate, lte: endDate },
-      },
-      include: {
-        product: {
-          include: {
-            brand: { select: { brandName: true, costDiscountPercent: true, costDiscountStartDate: true } },
-            transactions: {
-              where: { transactionType: { in: ['ORDER', 'RESTOCK'] } },
-              orderBy: { transactionDate: 'desc' },
-              take: 1,
-            },
-          },
-        },
-      },
-    });
+    const returnsInMonth = await returnsInPeriod(period);
 
     type ReturnRow = {
       brandName: string;
@@ -177,117 +120,82 @@ export async function GET(request: NextRequest) {
     const returnRows: ReturnRow[] = [];
     const returnsByBrand: Record<string, { units: number; creditValue: number }> = {};
     for (const r of returnsInMonth) {
-      const orderTx = r.product.transactions[0];
-      let unitCost = orderTx ? Number(orderTx.unitCost) : 0;
-      const brand = r.product.brand;
+      let unitCost = r.receivedUnitCost ?? 0;
       if (
         unitCost > 0 &&
-        brand.costDiscountPercent &&
-        Number(brand.costDiscountPercent) > 0 &&
-        brand.costDiscountStartDate &&
-        r.transactionDate >= brand.costDiscountStartDate
+        r.costDiscountPercent &&
+        Number(r.costDiscountPercent) > 0 &&
+        r.costDiscountStartDate &&
+        r.transactionDate >= r.costDiscountStartDate
       ) {
-        unitCost = unitCost * (1 - Number(brand.costDiscountPercent) / 100);
+        unitCost = unitCost * (1 - Number(r.costDiscountPercent) / 100);
       }
       const creditValue = unitCost * r.quantity;
       returnRows.push({
-        brandName: brand.brandName,
-        styleNumber: r.product.styleNumber,
-        colorCode: r.product.colorCode,
-        eyeSize: r.product.eyeSize,
+        brandName: r.brandName,
+        styleNumber: r.styleNumber,
+        colorCode: r.colorCode,
+        eyeSize: r.eyeSize,
         date: r.transactionDate,
         quantity: r.quantity,
         creditPerUnit: unitCost,
         creditValue,
       });
-      if (!returnsByBrand[brand.brandName]) {
-        returnsByBrand[brand.brandName] = { units: 0, creditValue: 0 };
+      if (!returnsByBrand[r.brandName]) {
+        returnsByBrand[r.brandName] = { units: 0, creditValue: 0 };
       }
-      returnsByBrand[brand.brandName].units += r.quantity;
-      returnsByBrand[brand.brandName].creditValue += creditValue;
+      returnsByBrand[r.brandName].units += r.quantity;
+      returnsByBrand[r.brandName].creditValue += creditValue;
     }
 
-    const allInventorySales = await prisma.inventoryTransaction.findMany({
-      where: { transactionType: 'SALE' },
-      include: {
-        product: {
-          include: {
-            brand: { select: { brandName: true, costDiscountPercent: true, costDiscountStartDate: true } },
-            transactions: {
-              where: { transactionType: { in: ['ORDER', 'RESTOCK'] } },
-              orderBy: { transactionDate: 'desc' },
-              take: 1,
-            },
-          },
-        },
-      },
-    });
-    const allRxSales = await prisma.rxSale.findMany({
-      include: { brand: { select: { brandName: true } } },
-    });
-    const allReturns = await prisma.inventoryTransaction.findMany({
-      where: { transactionType: 'WRITE_OFF', writeOffReason: 'return' },
-      include: {
-        product: {
-          include: {
-            brand: { select: { brandName: true, costDiscountPercent: true, costDiscountStartDate: true } },
-            transactions: {
-              where: { transactionType: { in: ['ORDER', 'RESTOCK'] } },
-              orderBy: { transactionDate: 'desc' },
-              take: 1,
-            },
-          },
-        },
-      },
-    });
+    const allInventorySales = await allSalesEver();
+    const allRxSaleRows = await allRxSalesEver();
+    const allReturnRows = await allReturnsEver();
     const creditEvents: CreditLedgerEvent[] = [];
     for (const s of allInventorySales) {
       let cogs = Number(s.unitCost);
-      if (cogs === 0 && s.product.transactions.length > 0) {
-        cogs = Number(s.product.transactions[0].unitCost);
-        const brand = s.product.brand;
+      if (cogs === 0 && s.receivedUnitCost !== null) {
+        cogs = Number(s.receivedUnitCost);
         if (
-          brand.costDiscountPercent &&
-          Number(brand.costDiscountPercent) > 0 &&
-          brand.costDiscountStartDate &&
-          s.transactionDate >= brand.costDiscountStartDate
+          s.costDiscountPercent &&
+          Number(s.costDiscountPercent) > 0 &&
+          s.costDiscountStartDate &&
+          s.transactionDate >= s.costDiscountStartDate
         ) {
-          cogs = cogs * (1 - Number(brand.costDiscountPercent) / 100);
+          cogs = cogs * (1 - Number(s.costDiscountPercent) / 100);
         }
       }
       if (cogs <= 0) continue;
       creditEvents.push({
-        brandName: s.product.brand.brandName,
+        brandName: s.brandName,
         date: s.transactionDate,
         type: 'COST',
         amount: cogs * s.quantity,
       });
     }
-    for (const rx of allRxSales) {
+    for (const rx of allRxSaleRows) {
       const cogs = Number(rx.costPrice);
       if (cogs <= 0) continue;
       creditEvents.push({
-        brandName: rx.brand.brandName,
+        brandName: rx.brandName,
         date: rx.saleDate,
         type: 'COST',
         amount: cogs,
       });
     }
-    for (const r of allReturns) {
-      const orderTx = r.product.transactions[0];
-      let unitCost = orderTx ? Number(orderTx.unitCost) : 0;
-      const brand = r.product.brand;
+    for (const r of allReturnRows) {
+      let unitCost = r.receivedUnitCost ?? 0;
       if (
         unitCost > 0 &&
-        brand.costDiscountPercent &&
-        Number(brand.costDiscountPercent) > 0 &&
-        brand.costDiscountStartDate &&
-        r.transactionDate >= brand.costDiscountStartDate
+        r.costDiscountPercent &&
+        Number(r.costDiscountPercent) > 0 &&
+        r.costDiscountStartDate &&
+        r.transactionDate >= r.costDiscountStartDate
       ) {
-        unitCost = unitCost * (1 - Number(brand.costDiscountPercent) / 100);
+        unitCost = unitCost * (1 - Number(r.costDiscountPercent) / 100);
       }
       creditEvents.push({
-        brandName: brand.brandName,
+        brandName: r.brandName,
         date: r.transactionDate,
         type: 'RETURN_CREDIT',
         amount: unitCost * r.quantity,

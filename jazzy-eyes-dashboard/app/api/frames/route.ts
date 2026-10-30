@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { brandExists, createFrame, findProduct, findStatusByName, listFrames, transactionJson } from '@/db/frames';
 import { frameFormSchema } from '@/lib/validations/admin';
 
 function generateCompositeId(
@@ -36,22 +36,14 @@ export async function POST(request: NextRequest) {
       data.eyeSize
     );
 
-    const brand = await prisma.brand.findUnique({
-      where: { id: data.brandId },
-    });
-
-    if (!brand) {
+    if (!(await brandExists(data.brandId))) {
       return NextResponse.json(
         { success: false, error: 'Brand not found' },
         { status: 404 }
       );
     }
 
-    const existingProduct = await prisma.product.findUnique({
-      where: { compositeId },
-    });
-
-    if (existingProduct) {
+    if (await findProduct(compositeId)) {
       return NextResponse.json(
         {
           success: false,
@@ -61,49 +53,37 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const activeStatus = await prisma.frameStatus.findUnique({
-      where: { name: 'Active' },
-    });
+    const activeStatus = await findStatusByName('Active');
 
-    const result = await prisma.$transaction(async (tx) => {
-      const product = await tx.product.create({
-        data: {
-          compositeId,
-          brandId: data.brandId,
-          statusId: activeStatus?.id,
-          styleNumber: data.styleNumber,
-          colorCode: data.colorCode,
-          eyeSize: data.eyeSize,
-          gender: data.gender,
-          frameType: data.frameType,
-          productType: data.productType,
-        },
-      });
-
-      const invoiceDate = data.invoiceDate ? new Date(data.invoiceDate) : null;
-      const transactionDate = invoiceDate || new Date();
-
-      await tx.inventoryTransaction.create({
-        data: {
-          productId: compositeId,
-          transactionType: 'ORDER',
-          transactionDate,
-          invoiceDate,
-          quantity: 1,
-          unitCost: data.costPrice,
-          unitPrice: data.retailPrice,
-          status: 'completed',
-          notes: data.notes || null,
-          isSpecialOrder: data.isSpecialOrder ?? false,
-        },
-      });
-
-      return product;
-    });
+    const invoiceDate = data.invoiceDate ? new Date(data.invoiceDate) : null;
+    const frameId = await createFrame(
+      {
+        compositeId,
+        brandId: data.brandId,
+        statusId: activeStatus?.id,
+        styleNumber: data.styleNumber,
+        colorCode: data.colorCode,
+        eyeSize: data.eyeSize,
+        gender: data.gender,
+        frameType: data.frameType,
+        productType: data.productType,
+      },
+      {
+        transactionType: 'ORDER',
+        transactionDate: invoiceDate || new Date(),
+        invoiceDate,
+        quantity: 1,
+        unitCost: data.costPrice,
+        unitPrice: data.retailPrice,
+        status: 'completed',
+        notes: data.notes || null,
+        isSpecialOrder: data.isSpecialOrder ?? false,
+      }
+    );
 
     return NextResponse.json({
       success: true,
-      frameId: result.compositeId,
+      frameId,
       message: 'Frame added successfully',
     });
   } catch (error) {
@@ -121,20 +101,11 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   try {
-    const products = await prisma.product.findMany({
-      include: {
-        brand: {
-          select: {
-            brandName: true,
-            companyName: true,
-          },
-        },
-        transactions: {
-          orderBy: { transactionDate: 'desc' },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    const frames = await listFrames();
+    const products = frames.map((product) => ({
+      ...product,
+      transactions: product.transactions.map(transactionJson),
+    }));
 
     return NextResponse.json({ success: true, products });
   } catch (error) {

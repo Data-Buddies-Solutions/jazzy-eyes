@@ -1,18 +1,16 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import {
+  brandExists,
+  createBrand,
+  highestCompanyId,
+  listBrandsWithProductCounts,
+} from '@/db/brands';
 import { createCompanySchema, createBrandSchema } from '@/lib/validations/admin';
 import type { CompanyGroup } from '@/types/admin';
 
 export async function GET() {
   try {
-    const brands = await prisma.brand.findMany({
-      include: {
-        _count: {
-          select: { products: true },
-        },
-      },
-      orderBy: [{ companyId: 'asc' }, { id: 'asc' }],
-    });
+    const brands = await listBrandsWithProductCounts();
 
     const companyMap = new Map<number, CompanyGroup>();
 
@@ -36,7 +34,7 @@ export async function GET() {
         allocationQuantity: brand.allocationQuantity,
         costDiscountPercent: brand.costDiscountPercent ? Number(brand.costDiscountPercent) : 0,
         costDiscountStartDate: brand.costDiscountStartDate?.toISOString() ?? null,
-        productCount: brand._count.products,
+        productCount: brand.productCount,
       });
       company.totalBrands++;
       company.totalAllocation += brand.allocationQuantity;
@@ -78,14 +76,10 @@ export async function POST(request: Request) {
 
       const { companyName } = validation.data;
 
-      const maxCompany = await prisma.brand.findFirst({
-        orderBy: { companyId: 'desc' },
-        select: { companyId: true },
-      });
+      const maxCompanyId = await highestCompanyId();
 
-      const nextCompanyId = maxCompany
-        ? Math.ceil((maxCompany.companyId + 1) / 1000) * 1000
-        : 1000;
+      const nextCompanyId =
+        maxCompanyId === null ? 1000 : Math.ceil((maxCompanyId + 1) / 1000) * 1000;
 
       return NextResponse.json({
         success: true,
@@ -104,31 +98,30 @@ export async function POST(request: Request) {
       const { brandId, companyName, companyId, brandName, allocationQuantity } =
         validation.data;
 
-      const existingBrand = await prisma.brand.findUnique({
-        where: { id: brandId },
-      });
-
-      if (existingBrand) {
+      if (await brandExists(brandId)) {
         return NextResponse.json(
           { success: false, error: `Brand ID ${brandId} already exists` },
           { status: 409 }
         );
       }
 
-      const brand = await prisma.brand.create({
-        data: {
-          id: brandId,
-          companyId,
-          companyName,
-          brandName,
-          allocationQuantity,
-        },
+      const brand = await createBrand({
+        id: brandId,
+        companyId,
+        companyName,
+        brandName,
+        allocationQuantity,
       });
 
       return NextResponse.json({
         success: true,
         brandId,
-        brand,
+        brand: {
+          ...brand,
+          // Prisma serialized Decimal columns as strings; clients still receive that shape.
+          costDiscountPercent:
+            brand.costDiscountPercent === null ? null : String(brand.costDiscountPercent),
+        },
         message: `Brand created with ID: ${brandId}`,
       });
     } else {
