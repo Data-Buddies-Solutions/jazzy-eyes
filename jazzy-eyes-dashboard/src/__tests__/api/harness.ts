@@ -55,19 +55,28 @@ export function useRouteHarness(): void {
   afterAll(async () => {
     const leftover = (globalThis as { prisma?: { $disconnect(): Promise<void> } }).prisma
     await leftover?.$disconnect()
+    await getPool().query('DEALLOCATE ALL')
   })
 }
 
-type Handler = (request: NextRequest, context: { params: Promise<Record<string, string>> }) => Promise<Response>
+type Params = Record<string, string>
 
-export type Call = {
+type Handler<P extends Params> = (
+  request: NextRequest,
+  context: { params: Promise<P> }
+) => Promise<Response>
+
+export type Call<P extends Params = Params> = {
   method?: string
   path: string
-  params?: Record<string, string>
+  params?: P
   body?: unknown
 }
 
-export async function call(handler: Handler, { method = 'GET', path, params = {}, body }: Call) {
+export async function call<P extends Params>(
+  handler: Handler<P>,
+  { method = 'GET', path, params = {} as P, body }: Call<P>
+) {
   const request = new NextRequest(new URL(path, 'http://localhost'), {
     method,
     headers: body === undefined ? undefined : { 'content-type': 'application/json' },
