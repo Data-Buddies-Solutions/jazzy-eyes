@@ -20,6 +20,8 @@ import {
   revertedWriteOffIds,
   searchFrames,
   transactionJson,
+  setProductStatus,
+  updateTransaction,
 } from '../frames'
 import { db } from '../pool'
 import { sql } from '../sql'
@@ -151,8 +153,8 @@ describe('searchFrames', () => {
     expect(await ids('acme', 'color')).toEqual([])
   })
 
-  it('treats LIKE wildcards in the query literally', async () => {
-    expect(await ids('%')).toEqual(['2-A%B-BLU-53'])
+  it('passes LIKE wildcards in the query through, as Prisma did', async () => {
+    expect((await ids('%')).length).toBeGreaterThan(1)
   })
 })
 
@@ -292,5 +294,14 @@ describe('write-offs', () => {
     expect(await revertedWriteOffIds()).toEqual(new Map([[old, revert]]))
     expect(await revertedWriteOffIds('1-AB1-BLK-50')).toEqual(new Map([[old, revert]]))
     expect(await revertedWriteOffIds('2-ZZ9-GRN-52')).toEqual(new Map())
+  })
+})
+
+describe('updates that match no row', () => {
+  it('throw instead of reporting success', async () => {
+    await expect(setProductStatus('missing', 1)).rejects.toThrow('product missing does not exist')
+    await expect(updateTransaction(999_999, { notes: 'x' })).rejects.toThrow(
+      'transaction 999999 does not exist'
+    )
   })
 })

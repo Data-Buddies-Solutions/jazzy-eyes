@@ -32,7 +32,7 @@ export async function GET() {
         companyName: brand.companyName,
         companyId: brand.companyId,
         allocationQuantity: brand.allocationQuantity,
-        costDiscountPercent: brand.costDiscountPercent ? Number(brand.costDiscountPercent) : 0,
+        costDiscountPercent: brand.costDiscountPercent ?? 0,
         costDiscountStartDate: brand.costDiscountStartDate?.toISOString() ?? null,
         productCount: brand.productCount,
       });

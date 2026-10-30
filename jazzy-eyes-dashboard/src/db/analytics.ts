@@ -87,8 +87,8 @@ export function inStockProductRows() {
 }
 
 // Every brand by name, with all its products (each holding its transactions in the
-// range) and its RX sales in the range. Transactions and RX sales come by date: the
-// route sums margins in that order, and Prisma's range query returned them that way.
+// range) and its RX sales in the range. Transactions and RX sales come by date, then
+// id: the route sums margins and picks its fallback order cost in that order.
 export async function brandsWithActivity(range: DateRange) {
   const brandList = await db.rows(sql`SELECT ${selectAll(brands)} FROM brands ORDER BY brand_name, id`)
   const productList = await db.rows(sql`

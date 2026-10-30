@@ -129,8 +129,8 @@ export async function GET(request: NextRequest) {
 
       const endingQty = beginningQty + added - returned - sold - otherAdjustments;
       const orderTx = p.transactions.find((t) => t.transactionType === 'ORDER');
-      const retailPrice = orderTx ? Number(orderTx.unitPrice) : 0;
-      const costPrice = orderTx ? Number(orderTx.unitCost) : 0;
+      const retailPrice = orderTx ? orderTx.unitPrice : 0;
+      const costPrice = orderTx ? orderTx.unitCost : 0;
       const displayStatus = getDisplayStatus(p.currentQty, p.statusName, p.transactions);
       const discontinuedInStockQty = displayStatus === 'Discontinued' ? p.currentQty : 0;
 
@@ -199,8 +199,8 @@ export async function GET(request: NextRequest) {
       frameType: so.frameType,
       productType: so.productType,
       quantity: so.quantity,
-      unitCost: Number(so.unitCost),
-      unitPrice: Number(so.unitPrice),
+      unitCost: so.unitCost,
+      unitPrice: so.unitPrice,
       transactionDate: so.transactionDate.toISOString(),
       invoiceNumber: so.invoiceNumber,
       status: so.status,

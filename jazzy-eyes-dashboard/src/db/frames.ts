@@ -1,5 +1,5 @@
 import { db } from './pool'
-import { and, array, expression, likeContains, likeStartsWith, or, raw, sql, type Sql } from './sql'
+import { and, array, expression, or, raw, sql, type Sql } from './sql'
 import { insert, select, selectAll, set } from './table'
 import { brands, frameStatuses, inventoryTransactions, products } from './tables'
 import type { FrameStatus, InventoryTransaction, Product, TransactionType } from './types'
@@ -39,10 +39,9 @@ async function withTransactions<P extends Product>(
   const transactions = await db.rows(
     sql`SELECT ${transaction} FROM inventory_transactions WHERE product_id = ANY(${array(ids)}) ORDER BY ${order}`
   )
-  return rows.map((row) => ({
-    ...row,
-    transactions: transactions.filter((t) => t.productId === row.compositeId),
-  }))
+  const byProduct = new Map<string, InventoryTransaction[]>()
+  for (const t of transactions) byProduct.set(t.productId, [...(byProduct.get(t.productId) ?? []), t])
+  return rows.map((row) => ({ ...row, transactions: byProduct.get(row.compositeId) ?? [] }))
 }
 
 // Prisma serialized Decimal columns as strings; the API responses keep that shape.
@@ -72,11 +71,11 @@ export async function searchFrames({ query, searchMode }: FrameSearch) {
   const matches = !query
     ? null
     : searchMode === 'color'
-      ? sql`p.color_code ILIKE ${likeContains(query)}`
+      ? sql`p.color_code ILIKE ${`%${query}%`}`
       : or(
-          sql`p.composite_id ILIKE ${likeStartsWith(query)}`,
-          sql`b.brand_name ILIKE ${likeContains(query)}`,
-          sql`p.style_number ILIKE ${likeContains(query)}`
+          sql`p.composite_id ILIKE ${`${query}%`}`,
+          sql`b.brand_name ILIKE ${`%${query}%`}`,
+          sql`p.style_number ILIKE ${`%${query}%`}`
         )
   const rows = await db.rows(
     sql`SELECT ${product}, ${brandSummary}, ${statusSummary}
@@ -163,9 +162,10 @@ export async function renameProduct(
 }
 
 export async function setProductStatus(compositeId: string, statusId: number): Promise<void> {
-  await db.affected(
+  const updated = await db.affected(
     sql`UPDATE products SET ${set(products, { statusId: integer(statusId, 'statusId') })} WHERE composite_id = ${compositeId}`
   )
+  if (updated === 0) throw new Error(`product ${compositeId} does not exist`)
 }
 
 export async function findStatus(id: number): Promise<FrameStatus | null> {
@@ -216,7 +216,10 @@ export type TransactionPatch = Partial<
 >
 
 export async function updateTransaction(id: number, patch: TransactionPatch): Promise<void> {
-  await db.affected(sql`UPDATE inventory_transactions SET ${set(inventoryTransactions, patch)} WHERE id = ${id}`)
+  const updated = await db.affected(
+    sql`UPDATE inventory_transactions SET ${set(inventoryTransactions, patch)} WHERE id = ${id}`
+  )
+  if (updated === 0) throw new Error(`transaction ${id} does not exist`)
 }
 
 export function findRevert(productId: string, writeOffId: number): Promise<InventoryTransaction | null> {

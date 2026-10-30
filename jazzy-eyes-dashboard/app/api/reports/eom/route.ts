@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     const rxSales = await rxSalesInPeriod(period);
 
     const formattedInventorySales = inventorySales.map((sale) => {
-      let unitCost = Number(sale.unitCost);
+      let unitCost = sale.unitCost;
       if (unitCost === 0 && sale.receivedUnitCost !== null) {
         unitCost = Number(sale.receivedUnitCost);
         if (
@@ -48,11 +48,11 @@ export async function GET(request: NextRequest) {
         frameType: sale.frameType,
         productType: sale.productType,
         quantity: sale.quantity,
-        unitPrice: Number(sale.unitPrice),
+        unitPrice: sale.unitPrice,
         unitCost,
-        totalRevenue: Number(sale.unitPrice) * sale.quantity,
+        totalRevenue: sale.unitPrice * sale.quantity,
         totalCost: unitCost * sale.quantity,
-        profit: (Number(sale.unitPrice) - unitCost) * sale.quantity,
+        profit: (sale.unitPrice - unitCost) * sale.quantity,
       };
     });
 
@@ -68,11 +68,11 @@ export async function GET(request: NextRequest) {
       frameType: sale.frameType,
       productType: sale.productType,
       quantity: 1,
-      unitPrice: Number(sale.salePrice),
-      unitCost: Number(sale.costPrice),
-      totalRevenue: Number(sale.salePrice),
-      totalCost: Number(sale.costPrice),
-      profit: Number(sale.salePrice) - Number(sale.costPrice),
+      unitPrice: sale.salePrice,
+      unitCost: sale.costPrice,
+      totalRevenue: sale.salePrice,
+      totalCost: sale.costPrice,
+      profit: sale.salePrice - sale.costPrice,
     }));
 
     const allSales = [...formattedInventorySales, ...formattedRxSales].sort(
@@ -153,7 +153,7 @@ export async function GET(request: NextRequest) {
     const allReturnRows = await allReturnsEver();
     const creditEvents: CreditLedgerEvent[] = [];
     for (const s of allInventorySales) {
-      let cogs = Number(s.unitCost);
+      let cogs = s.unitCost;
       if (cogs === 0 && s.receivedUnitCost !== null) {
         cogs = Number(s.receivedUnitCost);
         if (
@@ -174,7 +174,7 @@ export async function GET(request: NextRequest) {
       });
     }
     for (const rx of allRxSaleRows) {
-      const cogs = Number(rx.costPrice);
+      const cogs = rx.costPrice;
       if (cogs <= 0) continue;
       creditEvents.push({
         brandName: rx.brandName,
