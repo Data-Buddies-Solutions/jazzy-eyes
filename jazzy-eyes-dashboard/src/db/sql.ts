@@ -118,15 +118,3 @@ export function expression<T>() {
   return <A extends string>(alias: A, fragment: Sql<unknown>): Sql<{ [K in A]: T }> =>
     sql`(${fragment}) AS ${identifier(alias)}` as Sql<{ [K in A]: T }>
 }
-
-export function likeContains(term: string): string {
-  return `%${escapeLike(term)}%`
-}
-
-export function likeStartsWith(term: string): string {
-  return `${escapeLike(term)}%`
-}
-
-function escapeLike(term: string): string {
-  return term.replace(/[\\%_]/g, (char) => `\\${char}`)
-}

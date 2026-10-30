@@ -1,4 +1,5 @@
 import type { RepProduct } from '@/lib/reports/sales-rep'
+import { groupBy } from './group'
 import { db } from './pool'
 import { and, array, expression, raw, sql, type Sql } from './sql'
 import { select } from './table'
@@ -10,16 +11,6 @@ export type Period = { start: Date; end: Date }
 // UTC calendar day is the boundary.
 function within(column: Sql, period: Period | null): Sql | null {
   return period && sql`${column} >= ${period.start} AND ${column} <= ${period.end}`
-}
-
-function groupByProduct<T extends { productId: string }>(rows: T[]): Map<string, Omit<T, 'productId'>[]> {
-  const grouped = new Map<string, Omit<T, 'productId'>[]>()
-  for (const { productId, ...rest } of rows) {
-    const list = grouped.get(productId) ?? []
-    list.push(rest)
-    grouped.set(productId, list)
-  }
-  return grouped
 }
 
 export function findBrand(id: number) {
@@ -82,7 +73,7 @@ export async function brandInventory(brandId: number) {
     LEFT JOIN frame_statuses s ON s.id = p.status_id
     WHERE p.brand_id = ${brandId}
     ORDER BY p.composite_id`)
-  const transactions = groupByProduct(
+  const transactions = groupBy(
     await db.rows(sql`
       SELECT ${select(
         inventoryTransactions,
@@ -92,7 +83,8 @@ export async function brandInventory(brandId: number) {
       FROM inventory_transactions t
       JOIN products p ON p.composite_id = t.product_id
       WHERE p.brand_id = ${brandId}
-      ORDER BY t.transaction_date, t.id`)
+      ORDER BY t.transaction_date, t.id`),
+    (t) => t.productId
   )
   return productRows.map((product) => ({ ...product, transactions: transactions.get(product.compositeId) ?? [] }))
 }
@@ -121,7 +113,7 @@ export async function repProducts(brandId: number, through: Date): Promise<RepPr
     FROM products
     WHERE brand_id = ${brandId}
     ORDER BY composite_id`)
-  const transactions = groupByProduct(
+  const transactions = groupBy(
     await db.rows(sql`
       SELECT ${select(
         inventoryTransactions,
@@ -131,7 +123,8 @@ export async function repProducts(brandId: number, through: Date): Promise<RepPr
       FROM inventory_transactions t
       JOIN products p ON p.composite_id = t.product_id
       WHERE p.brand_id = ${brandId} AND t.status = ${'completed'} AND t.transaction_date <= ${through}
-      ORDER BY t.transaction_date, t.id`)
+      ORDER BY t.transaction_date, t.id`),
+    (t) => t.productId
   )
   return productRows.map((product) => ({ ...product, transactions: transactions.get(product.compositeId) ?? [] }))
 }

@@ -1,3 +1,4 @@
+import { groupBy } from './group'
 import { db } from './pool'
 import { and, array, expression, or, raw, sql, type Sql } from './sql'
 import { insert, select, selectAll, set } from './table'
@@ -39,8 +40,7 @@ async function withTransactions<P extends Product>(
   const transactions = await db.rows(
     sql`SELECT ${transaction} FROM inventory_transactions WHERE product_id = ANY(${array(ids)}) ORDER BY ${order}`
   )
-  const byProduct = new Map<string, InventoryTransaction[]>()
-  for (const t of transactions) byProduct.set(t.productId, [...(byProduct.get(t.productId) ?? []), t])
+  const byProduct = groupBy(transactions, (t) => t.productId)
   return rows.map((row) => ({ ...row, transactions: byProduct.get(row.compositeId) ?? [] }))
 }
 

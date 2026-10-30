@@ -175,6 +175,7 @@ describe('reports', () => {
         currentQty: 1,
         transactions: [
           {
+            productId: '1-A',
             id: 1,
             transactionType: 'ORDER',
             transactionDate: new Date('2026-10-15T00:00:00.000Z'),

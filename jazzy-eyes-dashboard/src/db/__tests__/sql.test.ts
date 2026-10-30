@@ -7,8 +7,6 @@ import {
   expression,
   join,
   json,
-  likeContains,
-  likeStartsWith,
   or,
   raw,
   sql,
@@ -68,12 +66,10 @@ describe('sql', () => {
     expect(join([raw('a'), raw('b'), raw('c')], ', ').compile().text).toBe('a, b, c')
   })
 
-  it('names counts and escapes LIKE patterns', () => {
+  it('names counts', () => {
     expect(sql`SELECT ${count('total')} FROM t`.compile().text).toBe(
       'SELECT count(*)::int AS "total" FROM t'
     )
-    expect(likeContains('50%_off\\')).toBe('%50\\%\\_off\\\\%')
-    expect(likeStartsWith('pi_')).toBe('pi\\_%')
   })
 
   it('types a query by the selections it interpolates and nothing else', () => {

@@ -25,14 +25,14 @@ export async function GET(request: NextRequest) {
     const formattedInventorySales = inventorySales.map((sale) => {
       let unitCost = sale.unitCost;
       if (unitCost === 0 && sale.receivedUnitCost !== null) {
-        unitCost = Number(sale.receivedUnitCost);
+        unitCost = sale.receivedUnitCost;
         if (
           sale.costDiscountPercent &&
-          Number(sale.costDiscountPercent) > 0 &&
+          sale.costDiscountPercent > 0 &&
           sale.costDiscountStartDate &&
           sale.transactionDate >= sale.costDiscountStartDate
         ) {
-          unitCost = unitCost * (1 - Number(sale.costDiscountPercent) / 100);
+          unitCost = unitCost * (1 - sale.costDiscountPercent / 100);
         }
       }
 
@@ -124,11 +124,11 @@ export async function GET(request: NextRequest) {
       if (
         unitCost > 0 &&
         r.costDiscountPercent &&
-        Number(r.costDiscountPercent) > 0 &&
+        r.costDiscountPercent > 0 &&
         r.costDiscountStartDate &&
         r.transactionDate >= r.costDiscountStartDate
       ) {
-        unitCost = unitCost * (1 - Number(r.costDiscountPercent) / 100);
+        unitCost = unitCost * (1 - r.costDiscountPercent / 100);
       }
       const creditValue = unitCost * r.quantity;
       returnRows.push({
@@ -155,14 +155,14 @@ export async function GET(request: NextRequest) {
     for (const s of allInventorySales) {
       let cogs = s.unitCost;
       if (cogs === 0 && s.receivedUnitCost !== null) {
-        cogs = Number(s.receivedUnitCost);
+        cogs = s.receivedUnitCost;
         if (
           s.costDiscountPercent &&
-          Number(s.costDiscountPercent) > 0 &&
+          s.costDiscountPercent > 0 &&
           s.costDiscountStartDate &&
           s.transactionDate >= s.costDiscountStartDate
         ) {
-          cogs = cogs * (1 - Number(s.costDiscountPercent) / 100);
+          cogs = cogs * (1 - s.costDiscountPercent / 100);
         }
       }
       if (cogs <= 0) continue;
@@ -188,11 +188,11 @@ export async function GET(request: NextRequest) {
       if (
         unitCost > 0 &&
         r.costDiscountPercent &&
-        Number(r.costDiscountPercent) > 0 &&
+        r.costDiscountPercent > 0 &&
         r.costDiscountStartDate &&
         r.transactionDate >= r.costDiscountStartDate
       ) {
-        unitCost = unitCost * (1 - Number(r.costDiscountPercent) / 100);
+        unitCost = unitCost * (1 - r.costDiscountPercent / 100);
       }
       creditEvents.push({
         brandName: r.brandName,

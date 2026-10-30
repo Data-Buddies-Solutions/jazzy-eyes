@@ -154,7 +154,9 @@ describe('searchFrames', () => {
   })
 
   it('passes LIKE wildcards in the query through, as Prisma did', async () => {
-    expect((await ids('%')).length).toBeGreaterThan(1)
+    expect(await ids('%')).toEqual(['1-AB1-BLK-50', '2-A%B-BLU-53', '2-ZZ9-GRN-52'])
+    expect(await ids('B_')).toEqual(['1-AB1-BLK-50'])
+    expect(await ids('2_Z')).toEqual(['2-ZZ9-GRN-52'])
   })
 })
 

@@ -1,3 +1,4 @@
+import { groupBy } from './group'
 import { db } from './pool'
 import { and, expression, raw, sql, type Sql } from './sql'
 import { select, selectAll } from './table'
@@ -118,14 +119,4 @@ export async function brandsWithActivity(range: DateRange) {
     products: productsByBrand.get(brand.id) ?? [],
     rxSales: rxByBrand.get(brand.id) ?? [],
   }))
-}
-
-function groupBy<T, K>(items: readonly T[], key: (item: T) => K): Map<K, T[]> {
-  const groups = new Map<K, T[]>()
-  for (const item of items) {
-    const group = groups.get(key(item))
-    if (group) group.push(item)
-    else groups.set(key(item), [item])
-  }
-  return groups
 }
