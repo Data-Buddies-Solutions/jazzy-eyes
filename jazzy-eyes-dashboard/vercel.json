@@ -1,6 +1,11 @@
 {
   "redirects": [
     {
+      "source": "/",
+      "destination": "https://jazzy-eyes-1006405058436.us-east4.run.app/",
+      "permanent": false
+    },
+    {
       "source": "/:path*",
       "destination": "https://jazzy-eyes-1006405058436.us-east4.run.app/:path*",
       "permanent": false
