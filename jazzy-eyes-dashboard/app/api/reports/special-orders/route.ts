@@ -1,50 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { specialOrders } from '@/db/reports';
 
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const brandId = searchParams.get('brandId');
 
-    const where: any = { isSpecialOrder: true };
+    const brandIdNum = brandId ? parseInt(brandId) : NaN;
+    const specialOrderRows = await specialOrders(isNaN(brandIdNum) ? null : brandIdNum);
 
-    if (brandId) {
-      const brandIdNum = parseInt(brandId);
-      if (!isNaN(brandIdNum)) {
-        where.product = { brandId: brandIdNum };
-      }
-    }
-
-    const specialOrders = await prisma.inventoryTransaction.findMany({
-      where,
-      include: {
-        product: {
-          select: {
-            compositeId: true,
-            styleNumber: true,
-            colorCode: true,
-            frameType: true,
-            productType: true,
-            brand: {
-              select: { brandName: true },
-            },
-          },
-        },
-      },
-      orderBy: { transactionDate: 'desc' },
-    });
-
-    const specialOrderItems = specialOrders.map((so) => ({
+    const specialOrderItems = specialOrderRows.map((so) => ({
       id: so.id,
-      frameId: so.product.compositeId,
-      brand: so.product.brand.brandName,
-      model: so.product.styleNumber,
-      color: so.product.colorCode,
-      frameType: so.product.frameType,
-      productType: so.product.productType,
+      frameId: so.compositeId,
+      brand: so.brandName,
+      model: so.styleNumber,
+      color: so.colorCode,
+      frameType: so.frameType,
+      productType: so.productType,
       quantity: so.quantity,
-      unitCost: Number(so.unitCost),
-      unitPrice: Number(so.unitPrice),
+      unitCost: so.unitCost,
+      unitPrice: so.unitPrice,
       transactionDate: so.transactionDate.toISOString(),
       invoiceNumber: so.invoiceNumber,
       status: so.status,

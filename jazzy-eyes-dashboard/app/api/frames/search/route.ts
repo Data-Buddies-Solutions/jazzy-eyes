@@ -1,18 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { searchFrames } from '@/db/frames';
 import { parsePagination, paginationError } from '@/lib/http/pagination';
 
-type ProductWithRelations = Awaited<
-  ReturnType<typeof prisma.product.findMany>
->[number] & {
-  status: { id: number; name: string; colorScheme: string } | null;
-  transactions: Array<{
-    transactionType: string;
-    writeOffReason: string | null;
-  }>;
-};
+type SearchedFrame = Awaited<ReturnType<typeof searchFrames>>[number];
 
-function getDisplayStatus(product: ProductWithRelations) {
+function getDisplayStatus(product: SearchedFrame) {
   if (product.currentQty === 0) {
     const depletionTransaction = product.transactions.find(
       (t) => t.transactionType === 'SALE' || t.transactionType === 'WRITE_OFF'
@@ -53,64 +45,7 @@ export async function GET(request: NextRequest) {
     }
     const { page, limit, skip } = pagination;
 
-    const where: any = {};
-
-    if (query) {
-      if (searchMode === 'color') {
-        where.colorCode = {
-          contains: query,
-          mode: 'insensitive',
-        };
-      } else {
-        where.OR = [
-          {
-            compositeId: {
-              startsWith: query,
-              mode: 'insensitive',
-            },
-          },
-          {
-            brand: {
-              brandName: {
-                contains: query,
-                mode: 'insensitive',
-              },
-            },
-          },
-          {
-            styleNumber: {
-              contains: query,
-              mode: 'insensitive',
-            },
-          },
-        ];
-      }
-    }
-
-    const products = await prisma.product.findMany({
-      where,
-      include: {
-        brand: {
-          select: {
-            brandName: true,
-            companyName: true,
-          },
-        },
-        status: {
-          select: {
-            id: true,
-            name: true,
-            colorScheme: true,
-          },
-        },
-        transactions: {
-          select: { transactionType: true, writeOffReason: true, unitCost: true, unitPrice: true,
-            invoiceDate: true, notes: true, isSpecialOrder: true, transactionDate: true },
-          orderBy: { transactionDate: 'desc' },
-        },
-      },
-      orderBy: { compositeId: 'asc' },
-    });
+    const products = await searchFrames({ query, searchMode });
 
     const frames = products
       .map((product) => {
@@ -123,12 +58,8 @@ export async function GET(request: NextRequest) {
           (t) => t.transactionType === 'ORDER'
         );
 
-        const costPrice = orderTransaction
-          ? Number(orderTransaction.unitCost)
-          : 0;
-        const retailPrice = orderTransaction
-          ? Number(orderTransaction.unitPrice)
-          : 0;
+        const costPrice = orderTransaction ? orderTransaction.unitCost : 0;
+        const retailPrice = orderTransaction ? orderTransaction.unitPrice : 0;
         const invoiceDate = orderTransaction?.invoiceDate
           ? orderTransaction.invoiceDate.toISOString()
           : undefined;
@@ -152,7 +83,7 @@ export async function GET(request: NextRequest) {
           dateAdded: product.createdAt.toISOString(),
           notes: orderTransaction?.notes?.replace('DISCONTINUED', '').trim() || null,
           saleDate: saleTransaction ? saleTransaction.transactionDate.toISOString() : undefined,
-          salePrice: saleTransaction ? Number(saleTransaction.unitPrice) : undefined,
+          salePrice: saleTransaction ? saleTransaction.unitPrice : undefined,
           styleNumber: product.styleNumber,
           colorCode: product.colorCode,
           currentQty: product.currentQty,

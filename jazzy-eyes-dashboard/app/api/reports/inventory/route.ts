@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { brandInventory, findBrand, specialOrders } from '@/db/reports';
 
 type InventoryTransactionForStatus = {
   transactionType: string;
@@ -8,7 +8,7 @@ type InventoryTransactionForStatus = {
 
 function getDisplayStatus(
   currentQty: number,
-  statusName: string | undefined,
+  statusName: string | null,
   transactions: InventoryTransactionForStatus[]
 ) {
   if (currentQty === 0) {
@@ -73,10 +73,7 @@ export async function GET(request: NextRequest) {
         ? new Date(startDate.getTime() - 1)
         : INCEPTION_DATE;
 
-    const brand = await prisma.brand.findUnique({
-      where: { id: brandIdNum },
-      select: { brandName: true, companyName: true },
-    });
+    const brand = await findBrand(brandIdNum);
 
     if (!brand) {
       return NextResponse.json(
@@ -85,14 +82,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const products = await prisma.product.findMany({
-      where: { brandId: brandIdNum },
-      include: {
-        status: { select: { name: true, colorScheme: true } },
-        transactions: { orderBy: { transactionDate: 'asc' } },
-      },
-      orderBy: { compositeId: 'asc' },
-    });
+    const products = await brandInventory(brandIdNum);
 
     const frames = products.map((p) => {
       let beginningQty = 0;
@@ -139,9 +129,9 @@ export async function GET(request: NextRequest) {
 
       const endingQty = beginningQty + added - returned - sold - otherAdjustments;
       const orderTx = p.transactions.find((t) => t.transactionType === 'ORDER');
-      const retailPrice = orderTx ? Number(orderTx.unitPrice) : 0;
-      const costPrice = orderTx ? Number(orderTx.unitCost) : 0;
-      const displayStatus = getDisplayStatus(p.currentQty, p.status?.name, p.transactions);
+      const retailPrice = orderTx ? orderTx.unitPrice : 0;
+      const costPrice = orderTx ? orderTx.unitCost : 0;
+      const displayStatus = getDisplayStatus(p.currentQty, p.statusName, p.transactions);
       const discontinuedInStockQty = displayStatus === 'Discontinued' ? p.currentQty : 0;
 
       return {
@@ -150,9 +140,9 @@ export async function GET(request: NextRequest) {
         color: p.colorCode,
         frameType: p.frameType,
         productType: p.productType,
-        status: p.status?.name || 'Active',
+        status: p.statusName || 'Active',
         displayStatus,
-        statusColorScheme: p.status?.colorScheme || 'green',
+        statusColorScheme: p.statusColorScheme || 'green',
         beginningQty,
         added,
         returned,
@@ -199,35 +189,18 @@ export async function GET(request: NextRequest) {
       }
     );
 
-    const specialOrders = await prisma.inventoryTransaction.findMany({
-      where: {
-        isSpecialOrder: true,
-        product: { brandId: brandIdNum },
-      },
-      include: {
-        product: {
-          select: {
-            compositeId: true,
-            styleNumber: true,
-            colorCode: true,
-            frameType: true,
-            productType: true,
-          },
-        },
-      },
-      orderBy: { transactionDate: 'desc' },
-    });
+    const specialOrderRows = await specialOrders(brandIdNum);
 
-    const specialOrderItems = specialOrders.map((so) => ({
+    const specialOrderItems = specialOrderRows.map((so) => ({
       id: so.id,
-      frameId: so.product.compositeId,
-      model: so.product.styleNumber,
-      color: so.product.colorCode,
-      frameType: so.product.frameType,
-      productType: so.product.productType,
+      frameId: so.compositeId,
+      model: so.styleNumber,
+      color: so.colorCode,
+      frameType: so.frameType,
+      productType: so.productType,
       quantity: so.quantity,
-      unitCost: Number(so.unitCost),
-      unitPrice: Number(so.unitPrice),
+      unitCost: so.unitCost,
+      unitPrice: so.unitPrice,
       transactionDate: so.transactionDate.toISOString(),
       invoiceNumber: so.invoiceNumber,
       status: so.status,

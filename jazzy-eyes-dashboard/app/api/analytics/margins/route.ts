@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { returnWriteOffRows, rxSaleRows, saleRows } from '@/db/analytics';
 import type { MarginsResponse } from '@/types/analytics';
 
 export async function GET(request: NextRequest) {
@@ -18,51 +18,9 @@ export async function GET(request: NextRequest) {
     const startDate = new Date(startDateStr);
     const endDate = new Date(endDateStr);
 
-    const saleTransactions = await prisma.inventoryTransaction.findMany({
-      where: {
-        transactionType: 'SALE',
-        transactionDate: {
-          gte: startDate,
-          lte: endDate,
-        },
-      },
-      include: {
-        product: {
-          include: {
-            brand: {
-              select: {
-                brandName: true,
-                costDiscountPercent: true,
-                costDiscountStartDate: true,
-              },
-            },
-            transactions: {
-              where: {
-                transactionType: { in: ['ORDER', 'RESTOCK'] },
-              },
-              orderBy: { transactionDate: 'desc' },
-              take: 1,
-            },
-          },
-        },
-      },
-    });
-
-    const rxSales = await prisma.rxSale.findMany({
-      where: {
-        saleDate: {
-          gte: startDate,
-          lte: endDate,
-        },
-      },
-      include: {
-        brand: {
-          select: {
-            brandName: true,
-          },
-        },
-      },
-    });
+    const range = { start: startDate, end: endDate };
+    const saleTransactions = await saleRows(range);
+    const rxSales = await rxSaleRows(range);
 
     const brandMarginMap = new Map<
       string,
@@ -82,20 +40,19 @@ export async function GET(request: NextRequest) {
     >();
 
     saleTransactions.forEach((saleTransaction) => {
-      const brandName = saleTransaction.product.brand.brandName;
-      const brand = saleTransaction.product.brand;
+      const brandName = saleTransaction.brandName;
 
-      const revenue = Number(saleTransaction.unitPrice);
-      let cost = Number(saleTransaction.unitCost);
-      if (cost === 0 && saleTransaction.product.transactions.length > 0) {
-        cost = Number(saleTransaction.product.transactions[0].unitCost);
+      const revenue = saleTransaction.unitPrice;
+      let cost = saleTransaction.unitCost;
+      if (cost === 0 && saleTransaction.latestOrderCost !== null) {
+        cost = saleTransaction.latestOrderCost;
         if (
-          brand.costDiscountPercent &&
-          Number(brand.costDiscountPercent) > 0 &&
-          brand.costDiscountStartDate &&
-          saleTransaction.transactionDate >= brand.costDiscountStartDate
+          saleTransaction.costDiscountPercent &&
+          saleTransaction.costDiscountPercent > 0 &&
+          saleTransaction.costDiscountStartDate &&
+          saleTransaction.transactionDate >= saleTransaction.costDiscountStartDate
         ) {
-          cost = cost * (1 - Number(brand.costDiscountPercent) / 100);
+          cost = cost * (1 - saleTransaction.costDiscountPercent / 100);
         }
       }
 
@@ -112,7 +69,7 @@ export async function GET(request: NextRequest) {
       brandData.totalCost += cost;
       brandData.unitsSold += 1;
 
-      const productType = saleTransaction.product.productType;
+      const productType = saleTransaction.productType;
       if (!productTypeMarginMap.has(productType)) {
         productTypeMarginMap.set(productType, {
           revenue: 0,
@@ -126,9 +83,9 @@ export async function GET(request: NextRequest) {
     });
 
     rxSales.forEach((rx) => {
-      const brandName = rx.brand.brandName;
-      const revenue = Number(rx.salePrice);
-      const cost = Number(rx.costPrice);
+      const brandName = rx.brandName;
+      const revenue = rx.salePrice;
+      const cost = rx.costPrice;
 
       if (cost <= 0) return;
 
@@ -158,55 +115,23 @@ export async function GET(request: NextRequest) {
       productTypeData.cost += cost;
     });
 
-    const returnWriteOffs = await prisma.inventoryTransaction.findMany({
-      where: {
-        transactionType: 'WRITE_OFF',
-        writeOffReason: 'return',
-        transactionDate: {
-          gte: startDate,
-          lte: endDate,
-        },
-      },
-      select: {
-        quantity: true,
-        transactionDate: true,
-        product: {
-          select: {
-            brand: {
-              select: {
-                brandName: true,
-                costDiscountPercent: true,
-                costDiscountStartDate: true,
-              },
-            },
-            transactions: {
-              where: { transactionType: { in: ['ORDER', 'RESTOCK'] } },
-              select: { unitCost: true },
-              orderBy: { transactionDate: 'desc' },
-              take: 1,
-            },
-          },
-        },
-      },
-    });
+    const returnWriteOffs = await returnWriteOffRows(range);
 
     const returnCreditsByBrand = new Map<string, number>();
     for (const r of returnWriteOffs) {
-      const orderTx = r.product.transactions[0];
-      let unitCost = orderTx ? Number(orderTx.unitCost) : 0;
-      const brand = r.product.brand;
+      let unitCost = r.latestOrderCost ?? 0;
       if (
         unitCost > 0 &&
-        brand.costDiscountPercent &&
-        Number(brand.costDiscountPercent) > 0 &&
-        brand.costDiscountStartDate &&
-        r.transactionDate >= brand.costDiscountStartDate
+        r.costDiscountPercent &&
+        r.costDiscountPercent > 0 &&
+        r.costDiscountStartDate &&
+        r.transactionDate >= r.costDiscountStartDate
       ) {
-        unitCost = unitCost * (1 - Number(brand.costDiscountPercent) / 100);
+        unitCost = unitCost * (1 - r.costDiscountPercent / 100);
       }
       returnCreditsByBrand.set(
-        brand.brandName,
-        (returnCreditsByBrand.get(brand.brandName) ?? 0) + unitCost * r.quantity
+        r.brandName,
+        (returnCreditsByBrand.get(r.brandName) ?? 0) + unitCost * r.quantity
       );
     }
 

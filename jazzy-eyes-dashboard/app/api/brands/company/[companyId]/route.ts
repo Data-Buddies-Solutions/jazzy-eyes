@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { companyExists, renameCompany } from '@/db/brands';
 import { updateCompanySchema } from '@/lib/validations/admin';
 
 export async function PUT(
@@ -29,26 +29,19 @@ export async function PUT(
 
     const { companyName } = validation.data;
 
-    const existingCompany = await prisma.brand.findFirst({
-      where: { companyId },
-    });
-
-    if (!existingCompany) {
+    if (!(await companyExists(companyId))) {
       return NextResponse.json(
         { success: false, error: 'Company not found' },
         { status: 404 }
       );
     }
 
-    const result = await prisma.brand.updateMany({
-      where: { companyId },
-      data: { companyName },
-    });
+    const updatedCount = await renameCompany(companyId, companyName);
 
     return NextResponse.json({
       success: true,
-      updatedCount: result.count,
-      message: `Updated ${result.count} brand(s) for company ${companyName}`,
+      updatedCount,
+      message: `Updated ${updatedCount} brand(s) for company ${companyName}`,
     });
   } catch (error) {
     console.error('Error updating company:', error);

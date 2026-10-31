@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { rxSaleRows, saleRows } from '@/db/analytics';
 import type { SalesTrendsResponse } from '@/types/analytics';
 
 export async function GET(request: NextRequest) {
@@ -25,48 +25,9 @@ export async function GET(request: NextRequest) {
       day: '2-digit',
     });
 
-    const saleTransactions = await prisma.inventoryTransaction.findMany({
-      where: {
-        transactionType: 'SALE',
-        transactionDate: {
-          gte: startDate,
-          lte: endDate,
-        },
-      },
-      include: {
-        product: {
-          include: {
-            brand: {
-              select: {
-                brandName: true,
-              },
-            },
-          },
-        },
-      },
-      orderBy: {
-        transactionDate: 'asc',
-      },
-    });
-
-    const rxSales = await prisma.rxSale.findMany({
-      where: {
-        saleDate: {
-          gte: startDate,
-          lte: endDate,
-        },
-      },
-      include: {
-        brand: {
-          select: {
-            brandName: true,
-          },
-        },
-      },
-      orderBy: {
-        saleDate: 'asc',
-      },
-    });
+    const range = { start: startDate, end: endDate };
+    const saleTransactions = await saleRows(range, 'date');
+    const rxSales = await rxSaleRows(range, 'date');
 
     const dailySalesMap = new Map<
       string,
@@ -92,8 +53,8 @@ export async function GET(request: NextRequest) {
 
     saleTransactions.forEach((transaction) => {
       const dateStr = DATE_ONLY.format(transaction.transactionDate);
-      const brandName = transaction.product.brand.brandName;
-      const revenue = Number(transaction.unitPrice);
+      const brandName = transaction.brandName;
+      const revenue = transaction.unitPrice;
 
       if (!dailySalesMap.has(dateStr)) {
         dailySalesMap.set(dateStr, {
@@ -130,8 +91,8 @@ export async function GET(request: NextRequest) {
 
     rxSales.forEach((rx) => {
       const dateStr = DATE_ONLY.format(rx.saleDate);
-      const brandName = rx.brand.brandName;
-      const revenue = Number(rx.salePrice);
+      const brandName = rx.brandName;
+      const revenue = rx.salePrice;
 
       if (!dailySalesMap.has(dateStr)) {
         dailySalesMap.set(dateStr, {

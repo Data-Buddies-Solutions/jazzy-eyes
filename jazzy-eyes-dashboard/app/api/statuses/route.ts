@@ -1,17 +1,15 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import {
+  createStatus,
+  highestDisplayOrder,
+  listStatusesWithProductCounts,
+  statusNameExists,
+} from '@/db/statuses';
 import { createStatusSchema } from '@/lib/validations/admin';
 
 export async function GET() {
   try {
-    const statuses = await prisma.frameStatus.findMany({
-      include: {
-        _count: {
-          select: { products: true },
-        },
-      },
-      orderBy: { displayOrder: 'asc' },
-    });
+    const statuses = await listStatusesWithProductCounts();
 
     return NextResponse.json({
       success: true,
@@ -21,7 +19,7 @@ export async function GET() {
         colorScheme: status.colorScheme,
         isProtected: status.isProtected,
         displayOrder: status.displayOrder,
-        productCount: status._count.products,
+        productCount: status.productCount,
       })),
     });
   } catch (error) {
@@ -47,31 +45,20 @@ export async function POST(request: Request) {
 
     const { name, colorScheme } = validation.data;
 
-    const existingStatus = await prisma.frameStatus.findUnique({
-      where: { name },
-    });
-
-    if (existingStatus) {
+    if (await statusNameExists(name)) {
       return NextResponse.json(
         { success: false, error: `Status "${name}" already exists` },
         { status: 409 }
       );
     }
 
-    const maxOrder = await prisma.frameStatus.findFirst({
-      orderBy: { displayOrder: 'desc' },
-      select: { displayOrder: true },
-    });
+    const newDisplayOrder = ((await highestDisplayOrder()) || 0) + 1;
 
-    const newDisplayOrder = (maxOrder?.displayOrder || 0) + 1;
-
-    const status = await prisma.frameStatus.create({
-      data: {
-        name,
-        colorScheme,
-        isProtected: false,
-        displayOrder: newDisplayOrder,
-      },
+    const status = await createStatus({
+      name,
+      colorScheme,
+      isProtected: false,
+      displayOrder: newDisplayOrder,
     });
 
     return NextResponse.json({
