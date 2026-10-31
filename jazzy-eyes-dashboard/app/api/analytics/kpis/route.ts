@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { inStockProductRows, returnWriteOffRows, rxSaleRows, saleRows } from '@/db/analytics';
 import { calculateReturnCreditSummaries, type CreditLedgerEvent } from '@/lib/analytics/return-credits';
 
 export async function GET(request: NextRequest) {
@@ -18,164 +18,79 @@ export async function GET(request: NextRequest) {
     const startDate = new Date(startDateStr);
     const endDate = new Date(endDateStr);
 
-    const products = await prisma.product.findMany({
-      where: { currentQty: { gt: 0 } },
-      include: {
-        status: { select: { name: true } },
-        brand: { select: { brandName: true, costDiscountPercent: true, costDiscountStartDate: true } },
-        transactions: {
-          where: { transactionType: { in: ['ORDER', 'RESTOCK'] } },
-          orderBy: { transactionDate: 'desc' },
-          take: 1,
-        },
-      },
-    });
+    const range = { start: startDate, end: endDate };
+    const products = await inStockProductRows();
 
     let totalInventoryValue = 0;
     let totalQtyOnHand = 0;
     let discontinuedInStock = 0;
     for (const p of products) {
-      const orderTx = p.transactions[0];
-      let unitCost = orderTx ? Number(orderTx.unitCost) : 0;
+      let unitCost = p.latestOrderCost ?? 0;
       if (
         unitCost > 0 &&
-        p.brand.costDiscountPercent &&
-        Number(p.brand.costDiscountPercent) > 0 &&
-        p.brand.costDiscountStartDate &&
-        new Date() >= p.brand.costDiscountStartDate
+        p.costDiscountPercent &&
+        p.costDiscountPercent > 0 &&
+        p.costDiscountStartDate &&
+        new Date() >= p.costDiscountStartDate
       ) {
-        unitCost = unitCost * (1 - Number(p.brand.costDiscountPercent) / 100);
+        unitCost = unitCost * (1 - p.costDiscountPercent / 100);
       }
       totalInventoryValue += unitCost * p.currentQty;
       totalQtyOnHand += p.currentQty;
-      if (p.status?.name === 'Discontinued') {
+      if (p.statusName === 'Discontinued') {
         discontinuedInStock += p.currentQty;
       }
     }
     const currentInventory = totalQtyOnHand - discontinuedInStock;
 
-    const returnWriteOffs = await prisma.inventoryTransaction.findMany({
-      where: {
-        transactionType: 'WRITE_OFF',
-        writeOffReason: 'return',
-        transactionDate: { gte: startDate, lte: endDate },
-      },
-      include: {
-        product: {
-          include: {
-            brand: { select: { brandName: true, costDiscountPercent: true, costDiscountStartDate: true } },
-            transactions: {
-              where: { transactionType: { in: ['ORDER', 'RESTOCK'] } },
-              orderBy: { transactionDate: 'desc' },
-              take: 1,
-            },
-          },
-        },
-      },
-    });
+    const returnWriteOffs = await returnWriteOffRows(range);
 
     let returnsCount = 0;
     let returnsCreditValue = 0;
     for (const wo of returnWriteOffs) {
-      const orderTx = wo.product.transactions[0];
-      let unitCost = orderTx ? Number(orderTx.unitCost) : 0;
-      const brand = wo.product.brand;
-      if (
-        unitCost > 0 &&
-        brand.costDiscountPercent &&
-        Number(brand.costDiscountPercent) > 0 &&
-        brand.costDiscountStartDate &&
-        wo.transactionDate >= brand.costDiscountStartDate
-      ) {
-        unitCost = unitCost * (1 - Number(brand.costDiscountPercent) / 100);
-      }
       returnsCount += wo.quantity;
-      returnsCreditValue += unitCost * wo.quantity;
+      returnsCreditValue += returnUnitCost(wo) * wo.quantity;
     }
 
-    const allReturns = await prisma.inventoryTransaction.findMany({
-      where: { transactionType: 'WRITE_OFF', writeOffReason: 'return' },
-      include: {
-        product: {
-          include: {
-            brand: { select: { brandName: true, costDiscountPercent: true, costDiscountStartDate: true } },
-            transactions: {
-              where: { transactionType: { in: ['ORDER', 'RESTOCK'] } },
-              orderBy: { transactionDate: 'desc' },
-              take: 1,
-            },
-          },
-        },
-      },
-    });
-
-    const allInventorySales = await prisma.inventoryTransaction.findMany({
-      where: { transactionType: 'SALE' },
-      include: {
-        product: {
-          include: {
-            brand: { select: { brandName: true, costDiscountPercent: true, costDiscountStartDate: true } },
-            transactions: {
-              where: { transactionType: { in: ['ORDER', 'RESTOCK'] } },
-              orderBy: { transactionDate: 'desc' },
-              take: 1,
-            },
-          },
-        },
-      },
-    });
-    const allRxSales = await prisma.rxSale.findMany({
-      include: { brand: { select: { brandName: true } } },
-    });
+    const allReturns = await returnWriteOffRows();
+    const allInventorySales = await saleRows();
+    const allRxSales = await rxSaleRows();
 
     const events: CreditLedgerEvent[] = [];
     for (const r of allReturns) {
-      const orderTx = r.product.transactions[0];
-      let unitCost = orderTx ? Number(orderTx.unitCost) : 0;
-      const brand = r.product.brand;
-      if (
-        unitCost > 0 &&
-        brand.costDiscountPercent &&
-        Number(brand.costDiscountPercent) > 0 &&
-        brand.costDiscountStartDate &&
-        r.transactionDate >= brand.costDiscountStartDate
-      ) {
-        unitCost = unitCost * (1 - Number(brand.costDiscountPercent) / 100);
-      }
       events.push({
-        brandName: brand.brandName,
+        brandName: r.brandName,
         date: r.transactionDate,
         type: 'RETURN_CREDIT',
-        amount: unitCost * r.quantity,
+        amount: returnUnitCost(r) * r.quantity,
       });
     }
     for (const s of allInventorySales) {
-      let cogs = Number(s.unitCost);
-      if (cogs === 0 && s.product.transactions.length > 0) {
-        cogs = Number(s.product.transactions[0].unitCost);
-        const brand = s.product.brand;
+      let cogs = s.unitCost;
+      if (cogs === 0 && s.latestOrderCost !== null) {
+        cogs = s.latestOrderCost;
         if (
-          brand.costDiscountPercent &&
-          Number(brand.costDiscountPercent) > 0 &&
-          brand.costDiscountStartDate &&
-          s.transactionDate >= brand.costDiscountStartDate
+          s.costDiscountPercent &&
+          s.costDiscountPercent > 0 &&
+          s.costDiscountStartDate &&
+          s.transactionDate >= s.costDiscountStartDate
         ) {
-          cogs = cogs * (1 - Number(brand.costDiscountPercent) / 100);
+          cogs = cogs * (1 - s.costDiscountPercent / 100);
         }
       }
       if (cogs <= 0) continue;
       events.push({
-        brandName: s.product.brand.brandName,
+        brandName: s.brandName,
         date: s.transactionDate,
         type: 'COST',
         amount: cogs * s.quantity,
       });
     }
     for (const rx of allRxSales) {
-      const cogs = Number(rx.costPrice);
+      const cogs = rx.costPrice;
       if (cogs <= 0) continue;
       events.push({
-        brandName: rx.brand.brandName,
+        brandName: rx.brandName,
         date: rx.saleDate,
         type: 'COST',
         amount: cogs,
@@ -205,4 +120,22 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+type ReturnWriteOff = Awaited<ReturnType<typeof returnWriteOffRows>>[number];
+
+// A return credits the product's latest order cost, discounted when the return falls
+// on or after the brand's discount start.
+function returnUnitCost(wo: ReturnWriteOff): number {
+  let unitCost = wo.latestOrderCost ?? 0;
+  if (
+    unitCost > 0 &&
+    wo.costDiscountPercent &&
+    wo.costDiscountPercent > 0 &&
+    wo.costDiscountStartDate &&
+    wo.transactionDate >= wo.costDiscountStartDate
+  ) {
+    unitCost = unitCost * (1 - wo.costDiscountPercent / 100);
+  }
+  return unitCost;
 }

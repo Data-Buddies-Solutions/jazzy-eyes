@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import {
+  deleteStatus,
+  findStatusWithProductCount,
+  statusNameExists,
+  updateStatus,
+} from '@/db/statuses';
 import { updateStatusSchema } from '@/lib/validations/admin';
 
 export async function GET(
@@ -17,14 +22,7 @@ export async function GET(
       );
     }
 
-    const status = await prisma.frameStatus.findUnique({
-      where: { id: statusId },
-      include: {
-        _count: {
-          select: { products: true },
-        },
-      },
-    });
+    const status = await findStatusWithProductCount(statusId);
 
     if (!status) {
       return NextResponse.json(
@@ -41,7 +39,7 @@ export async function GET(
         colorScheme: status.colorScheme,
         isProtected: status.isProtected,
         displayOrder: status.displayOrder,
-        productCount: status._count.products,
+        productCount: status.productCount,
       },
     });
   } catch (error) {
@@ -78,14 +76,7 @@ export async function PUT(
       );
     }
 
-    const existingStatus = await prisma.frameStatus.findUnique({
-      where: { id: statusId },
-      include: {
-        _count: {
-          select: { products: true },
-        },
-      },
-    });
+    const existingStatus = await findStatusWithProductCount(statusId);
 
     if (!existingStatus) {
       return NextResponse.json(
@@ -102,11 +93,7 @@ export async function PUT(
     }
 
     if (validation.data.name && validation.data.name !== existingStatus.name) {
-      const duplicateName = await prisma.frameStatus.findUnique({
-        where: { name: validation.data.name },
-      });
-
-      if (duplicateName) {
+      if (await statusNameExists(validation.data.name)) {
         return NextResponse.json(
           { success: false, error: `Status "${validation.data.name}" already exists` },
           { status: 409 }
@@ -114,22 +101,19 @@ export async function PUT(
       }
     }
 
-    if (existingStatus._count.products > 0 && !body.confirmed) {
+    if (existingStatus.productCount > 0 && !body.confirmed) {
       return NextResponse.json(
         {
           success: false,
           requiresConfirmation: true,
-          productCount: existingStatus._count.products,
-          message: `This status is used by ${existingStatus._count.products} product(s). Changes will affect all associated products. Are you sure you want to continue?`,
+          productCount: existingStatus.productCount,
+          message: `This status is used by ${existingStatus.productCount} product(s). Changes will affect all associated products. Are you sure you want to continue?`,
         },
         { status: 409 }
       );
     }
 
-    const updatedStatus = await prisma.frameStatus.update({
-      where: { id: statusId },
-      data: validation.data,
-    });
+    const updatedStatus = await updateStatus(statusId, validation.data);
 
     return NextResponse.json({
       success: true,
@@ -160,14 +144,7 @@ export async function DELETE(
       );
     }
 
-    const existingStatus = await prisma.frameStatus.findUnique({
-      where: { id: statusId },
-      include: {
-        _count: {
-          select: { products: true },
-        },
-      },
-    });
+    const existingStatus = await findStatusWithProductCount(statusId);
 
     if (!existingStatus) {
       return NextResponse.json(
@@ -183,19 +160,17 @@ export async function DELETE(
       );
     }
 
-    if (existingStatus._count.products > 0) {
+    if (existingStatus.productCount > 0) {
       return NextResponse.json(
         {
           success: false,
-          error: `Cannot delete status "${existingStatus.name}" - it has ${existingStatus._count.products} product(s) associated with it. Please reassign products first.`,
+          error: `Cannot delete status "${existingStatus.name}" - it has ${existingStatus.productCount} product(s) associated with it. Please reassign products first.`,
         },
         { status: 409 }
       );
     }
 
-    await prisma.frameStatus.delete({
-      where: { id: statusId },
-    });
+    await deleteStatus(statusId);
 
     return NextResponse.json({
       success: true,

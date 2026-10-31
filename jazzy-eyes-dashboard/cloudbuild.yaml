@@ -1,0 +1,66 @@
+substitutions:
+  _REGION: us-east4
+  _SERVICE: jazzy-eyes
+  _CLOUDSQL_INSTANCE: acuity-health-prod:us-east4:onlinedoctornote-db
+  _IMAGE: us-east4-docker.pkg.dev/${PROJECT_ID}/jazzy-eyes/jazzy-eyes:${BUILD_ID}
+  _GIT_SHA: manual
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  dynamicSubstitutions: true
+
+availableSecrets:
+  secretManager:
+    - versionName: projects/${PROJECT_ID}/secrets/jazzy-eyes-database-url/versions/latest
+      env: DATABASE_URL
+
+steps:
+  - id: build
+    name: gcr.io/cloud-builders/docker
+    args: [build, --target, runtime, --tag, '${_IMAGE}', .]
+
+  - id: build-migrate
+    name: gcr.io/cloud-builders/docker
+    args: [build, --target, migrate, --tag, jazzy-eyes-migrate, .]
+
+  - id: push
+    name: gcr.io/cloud-builders/docker
+    args: [push, '${_IMAGE}']
+    waitFor: [build]
+
+  - id: migrate
+    name: jazzy-eyes-migrate
+    entrypoint: bash
+    secretEnv: [DATABASE_URL]
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        mkdir -p /cloudsql
+        cloud-sql-proxy --unix-socket /cloudsql '${_CLOUDSQL_INSTANCE}' &
+        socket='/cloudsql/${_CLOUDSQL_INSTANCE}/.s.PGSQL.5432'
+        for _ in $$(seq 30); do [ -S "$$socket" ] && break; sleep 1; done
+        cd /app && node_modules/.bin/tsx scripts/migrate.ts
+    waitFor: [build-migrate]
+
+  - id: deploy
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE}
+      - --image=${_IMAGE}
+      - --region=${_REGION}
+      - --service-account=${_SERVICE}@${PROJECT_ID}.iam.gserviceaccount.com
+      - --add-cloudsql-instances=${_CLOUDSQL_INSTANCE}
+      - --no-invoker-iam-check
+      - --port=3000
+      - --cpu=1
+      - --memory=512Mi
+      - --timeout=300
+      - --min-instances=0
+      - --max-instances=2
+      - --update-labels=commit-sha=${_GIT_SHA}
+      - --set-secrets=DATABASE_URL=jazzy-eyes-database-url:latest,ADMIN_EMAIL=jazzy-eyes-admin-email:latest,ADMIN_PASSWORD=jazzy-eyes-admin-password:latest
+    waitFor: [push, migrate]

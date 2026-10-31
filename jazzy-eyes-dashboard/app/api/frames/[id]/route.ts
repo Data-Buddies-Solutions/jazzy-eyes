@@ -1,36 +1,53 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import {
+  consumeFifo,
+  discountedCost,
+  findFrame,
+  findProduct,
+  findProductWithStatus,
+  findProductWithTransactions,
+  findRevert,
+  findStatus,
+  findStatusByName,
+  findTransaction,
+  latestBatchCost,
+  latestRetailPrice,
+  latestTransaction,
+  previewFifoCost,
+  recordMovement,
+  renameProduct,
+  revertedWriteOffIds,
+  setProductStatus,
+  transactionJson,
+  updateProduct,
+  updateTransaction,
+  type TransactionPatch,
+} from '@/db/frames';
+
+// Next always supplies the segment; a missing one failed inside Prisma, so it stays a 500.
+async function frameId(params: Promise<{ id: string }>): Promise<string> {
+  const { id } = await params;
+  if (id === undefined) throw new Error('frame id param is missing');
+  return id;
+}
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;
-    const compositeId = id;
+    const compositeId = await frameId(params);
 
-    const product = await prisma.product.findUnique({
-      where: { compositeId },
-      include: {
-        brand: {
-          select: {
-            brandName: true,
-            companyName: true,
-          },
-        },
-        transactions: {
-          orderBy: { transactionDate: 'desc' },
-        },
-      },
-    });
+    const frame = await findFrame(compositeId);
 
-    if (!product) {
+    if (!frame) {
       return NextResponse.json(
         { success: false, error: 'Frame not found' },
         { status: 404 }
       );
     }
 
+    const product = { ...frame, transactions: frame.transactions.map(transactionJson) };
     return NextResponse.json({ success: true, product });
   } catch (error) {
     console.error('Error fetching frame:', error);
@@ -55,14 +72,10 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;
-    const compositeId = id;
+    const compositeId = await frameId(params);
     const body = await request.json();
 
-    const existingProduct = await prisma.product.findUnique({
-      where: { compositeId },
-      include: { transactions: true },
-    });
+    const existingProduct = await findProduct(compositeId);
 
     if (!existingProduct) {
       return NextResponse.json(
@@ -85,9 +98,7 @@ export async function PUT(
     let updatedProduct;
 
     if (idChanged) {
-      const existingWithNewId = await prisma.product.findUnique({
-        where: { compositeId: newCompositeId },
-      });
+      const existingWithNewId = await findProduct(newCompositeId);
 
       if (existingWithNewId) {
         return NextResponse.json(
@@ -96,49 +107,31 @@ export async function PUT(
         );
       }
 
-      await prisma.$transaction(async (tx) => {
-        await tx.product.create({
-          data: {
-            compositeId: newCompositeId,
-            brandId: newBrandId,
-            statusId: existingProduct.statusId,
-            styleNumber: newStyleNumber,
-            colorCode: newColorCode,
-            eyeSize: newEyeSize,
-            gender: newGender,
-            frameType: newFrameType,
-            productType: newProductType,
-            currentQty: existingProduct.currentQty,
-            createdAt: existingProduct.createdAt,
-          },
-        });
-
-        await tx.inventoryTransaction.updateMany({
-          where: { productId: compositeId },
-          data: { productId: newCompositeId },
-        });
-
-        await tx.product.delete({
-          where: { compositeId },
-        });
+      await renameProduct(existingProduct, {
+        compositeId: newCompositeId,
+        brandId: newBrandId,
+        styleNumber: newStyleNumber,
+        colorCode: newColorCode,
+        eyeSize: newEyeSize,
+        gender: newGender,
+        frameType: newFrameType,
+        productType: newProductType,
       });
 
-      updatedProduct = await prisma.product.findUnique({
-        where: { compositeId: newCompositeId },
-        include: { transactions: true },
-      });
+      const renamed = await findProductWithTransactions(newCompositeId);
+      updatedProduct = renamed && {
+        ...renamed,
+        transactions: renamed.transactions.map(transactionJson),
+      };
     } else {
-      updatedProduct = await prisma.product.update({
-        where: { compositeId },
-        data: {
-          brandId: newBrandId,
-          styleNumber: newStyleNumber,
-          colorCode: newColorCode,
-          eyeSize: newEyeSize,
-          gender: newGender,
-          frameType: newFrameType,
-          productType: newProductType,
-        },
+      updatedProduct = await updateProduct(compositeId, {
+        brandId: newBrandId,
+        styleNumber: newStyleNumber,
+        colorCode: newColorCode,
+        eyeSize: newEyeSize,
+        gender: newGender,
+        frameType: newFrameType,
+        productType: newProductType,
       });
     }
 
@@ -150,22 +143,18 @@ export async function PUT(
       body.isSpecialOrder !== undefined
     ) {
       const productIdForTransaction = idChanged ? newCompositeId : compositeId;
-      const latestOrder = await prisma.inventoryTransaction.findFirst({
-        where: { productId: productIdForTransaction, transactionType: 'ORDER' },
-        orderBy: { transactionDate: 'desc' },
-      });
+      const latestOrder = await latestTransaction(productIdForTransaction, ['ORDER']);
 
       if (latestOrder) {
-        await prisma.inventoryTransaction.update({
-          where: { id: latestOrder.id },
-          data: {
-            unitCost: body.costPrice !== undefined ? body.costPrice : latestOrder.unitCost,
-            unitPrice: body.retailPrice !== undefined ? body.retailPrice : latestOrder.unitPrice,
-            invoiceDate: body.invoiceDate !== undefined ? (body.invoiceDate ? new Date(body.invoiceDate) : null) : latestOrder.invoiceDate,
-            notes: body.notes !== undefined ? body.notes : latestOrder.notes,
-            isSpecialOrder: body.isSpecialOrder !== undefined ? body.isSpecialOrder : latestOrder.isSpecialOrder,
-          },
-        });
+        const patch: TransactionPatch = {};
+        if (body.costPrice !== undefined) patch.unitCost = body.costPrice;
+        if (body.retailPrice !== undefined) patch.unitPrice = body.retailPrice;
+        if (body.invoiceDate !== undefined) {
+          patch.invoiceDate = body.invoiceDate ? new Date(body.invoiceDate) : null;
+        }
+        if (body.notes !== undefined) patch.notes = body.notes;
+        if (body.isSpecialOrder !== undefined) patch.isSpecialOrder = body.isSpecialOrder;
+        await updateTransaction(latestOrder.id, patch);
       }
     }
 
@@ -186,142 +175,17 @@ export async function PUT(
   }
 }
 
-async function applyBrandCostDiscount(
-  brandId: number,
-  cost: number,
-  saleDate: Date
-): Promise<number> {
-  const brand = await prisma.brand.findUnique({
-    where: { id: brandId },
-    select: { costDiscountPercent: true, costDiscountStartDate: true },
-  });
-  if (
-    brand?.costDiscountPercent &&
-    Number(brand.costDiscountPercent) > 0 &&
-    brand.costDiscountStartDate &&
-    saleDate >= brand.costDiscountStartDate
-  ) {
-    return cost * (1 - Number(brand.costDiscountPercent) / 100);
-  }
-  return cost;
-}
-
-async function previewFIFOCost(
-  productId: string,
-  quantityToConsume: number
-): Promise<number> {
-  const batches = await prisma.inventoryTransaction.findMany({
-    where: {
-      productId,
-      transactionType: { in: ['ORDER', 'RESTOCK'] },
-      remainingQty: { gt: 0 },
-    },
-    orderBy: { transactionDate: 'asc' },
-  });
-
-  let remainingToConsume = quantityToConsume;
-  let totalCost = 0;
-
-  for (const batch of batches) {
-    if (remainingToConsume <= 0) break;
-    const availableInBatch = batch.remainingQty || 0;
-    const consumeFromBatch = Math.min(availableInBatch, remainingToConsume);
-    totalCost += consumeFromBatch * Number(batch.unitCost);
-    remainingToConsume -= consumeFromBatch;
-  }
-
-  return quantityToConsume > 0 ? totalCost / quantityToConsume : 0;
-}
-
-async function consumeFIFOInventory(
-  productId: string,
-  quantityToConsume: number
-): Promise<{ totalCost: number; avgCost: number }> {
-  const batches = await prisma.inventoryTransaction.findMany({
-    where: {
-      productId,
-      transactionType: { in: ['ORDER', 'RESTOCK'] },
-      remainingQty: { gt: 0 },
-    },
-    orderBy: { transactionDate: 'asc' },
-  });
-
-  let remainingToConsume = quantityToConsume;
-  let totalCost = 0;
-
-  for (const batch of batches) {
-    if (remainingToConsume <= 0) break;
-
-    const availableInBatch = batch.remainingQty || 0;
-    const consumeFromBatch = Math.min(availableInBatch, remainingToConsume);
-
-    await prisma.inventoryTransaction.update({
-      where: { id: batch.id },
-      data: { remainingQty: availableInBatch - consumeFromBatch },
-    });
-
-    totalCost += consumeFromBatch * Number(batch.unitCost);
-    remainingToConsume -= consumeFromBatch;
-  }
-
-  const avgCost = quantityToConsume > 0 ? totalCost / quantityToConsume : 0;
-  return { totalCost, avgCost };
-}
-
-async function getSoldOutStatus() {
-  return await prisma.frameStatus.findUnique({
-    where: { name: 'Sold Out' },
-  });
-}
-
-async function getActiveStatus() {
-  return await prisma.frameStatus.findUnique({
-    where: { name: 'Active' },
-  });
-}
-
-async function getLatestCostPrice(productId: string): Promise<number> {
-  const latestBatch = await prisma.inventoryTransaction.findFirst({
-    where: {
-      productId,
-      transactionType: { in: ['ORDER', 'RESTOCK'] },
-    },
-    orderBy: { transactionDate: 'desc' },
-  });
-  return latestBatch ? Number(latestBatch.unitCost) : 0;
-}
-
-async function getRetailPrice(productId: string): Promise<number> {
-  const orderTransaction = await prisma.inventoryTransaction.findFirst({
-    where: {
-      productId,
-      transactionType: 'ORDER',
-    },
-    orderBy: { transactionDate: 'desc' },
-  });
-  return orderTransaction ? Number(orderTransaction.unitPrice) : 0;
-}
-
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;
-    const compositeId = id;
+    const compositeId = await frameId(params);
     const body = await request.json();
 
     const { action } = body;
 
-    const existingProduct = await prisma.product.findUnique({
-      where: { compositeId },
-      include: {
-        transactions: {
-          orderBy: { transactionDate: 'desc' },
-        },
-        status: true,
-      },
-    });
+    const existingProduct = await findProductWithStatus(compositeId);
 
     if (!existingProduct) {
       return NextResponse.json(
@@ -347,14 +211,14 @@ export async function PATCH(
         );
       }
 
-      const retailPrice = await getRetailPrice(compositeId);
+      const retailPrice = await latestRetailPrice(compositeId);
       const finalSalePrice = salePrice || retailPrice;
 
       const finalSaleDate = saleDate ? new Date(saleDate) : new Date();
 
-      const previewCost = await previewFIFOCost(compositeId, quantity);
+      const previewCost = await previewFifoCost(compositeId, quantity);
 
-      const discountedPreviewCost = await applyBrandCostDiscount(
+      const discountedPreviewCost = await discountedCost(
         existingProduct.brandId,
         previewCost,
         finalSaleDate
@@ -367,45 +231,30 @@ export async function PATCH(
         );
       }
 
-      const { avgCost } = await consumeFIFOInventory(compositeId, quantity);
+      const avgCost = await consumeFifo(compositeId, quantity);
 
-      const finalUnitCost = await applyBrandCostDiscount(
+      const finalUnitCost = await discountedCost(
         existingProduct.brandId,
         avgCost,
         finalSaleDate
       );
 
       const newQty = existingProduct.currentQty - quantity;
+      const soldOutStatus = newQty === 0 ? await findStatusByName('Sold Out') : null;
 
-      let statusUpdate = {};
-      if (newQty === 0) {
-        const soldOutStatus = await getSoldOutStatus();
-        if (soldOutStatus) {
-          statusUpdate = { statusId: soldOutStatus.id };
-        }
-      }
-
-      await prisma.$transaction([
-        prisma.inventoryTransaction.create({
-          data: {
-            productId: compositeId,
-            transactionType: 'SALE',
-            transactionDate: finalSaleDate,
-            quantity,
-            unitCost: finalUnitCost,
-            unitPrice: finalSalePrice,
-            status: 'completed',
-            notes: `Sold ${quantity} unit(s) via admin`,
-          },
-        }),
-        prisma.product.update({
-          where: { compositeId },
-          data: {
-            currentQty: newQty,
-            ...statusUpdate,
-          },
-        }),
-      ]);
+      await recordMovement(
+        {
+          productId: compositeId,
+          transactionType: 'SALE',
+          transactionDate: finalSaleDate,
+          quantity,
+          unitCost: finalUnitCost,
+          unitPrice: finalSalePrice,
+          status: 'completed',
+          notes: `Sold ${quantity} unit(s) via admin`,
+        },
+        { currentQty: newQty, statusId: soldOutStatus?.id }
+      );
 
       return NextResponse.json({
         success: true,
@@ -439,44 +288,25 @@ export async function PATCH(
         );
       }
 
-      let avgCost = 0;
-      if (reason !== 'return') {
-        const fifoResult = await consumeFIFOInventory(compositeId, quantity);
-        avgCost = fifoResult.avgCost;
-      }
+      const avgCost = reason === 'return' ? 0 : await consumeFifo(compositeId, quantity);
 
       const newQty = existingProduct.currentQty - quantity;
+      const soldOutStatus = newQty === 0 ? await findStatusByName('Sold Out') : null;
 
-      let statusUpdate = {};
-      if (newQty === 0) {
-        const soldOutStatus = await getSoldOutStatus();
-        if (soldOutStatus) {
-          statusUpdate = { statusId: soldOutStatus.id };
-        }
-      }
-
-      await prisma.$transaction([
-        prisma.inventoryTransaction.create({
-          data: {
-            productId: compositeId,
-            transactionType: 'WRITE_OFF',
-            transactionDate: new Date(),
-            quantity,
-            unitCost: avgCost,
-            unitPrice: 0,
-            status: 'completed',
-            writeOffReason: reason,
-            notes: notes || null,
-          },
-        }),
-        prisma.product.update({
-          where: { compositeId },
-          data: {
-            currentQty: newQty,
-            ...statusUpdate,
-          },
-        }),
-      ]);
+      await recordMovement(
+        {
+          productId: compositeId,
+          transactionType: 'WRITE_OFF',
+          transactionDate: new Date(),
+          quantity,
+          unitCost: avgCost,
+          unitPrice: 0,
+          status: 'completed',
+          writeOffReason: reason,
+          notes: notes || null,
+        },
+        { currentQty: newQty, statusId: soldOutStatus?.id }
+      );
 
       return NextResponse.json({
         success: true,
@@ -495,9 +325,7 @@ export async function PATCH(
         );
       }
 
-      const writeOffTransaction = await prisma.inventoryTransaction.findUnique({
-        where: { id: writeOffTransactionId },
-      });
+      const writeOffTransaction = await findTransaction(writeOffTransactionId);
 
       if (!writeOffTransaction) {
         return NextResponse.json(
@@ -520,15 +348,7 @@ export async function PATCH(
         );
       }
 
-      const existingRevert = await prisma.inventoryTransaction.findFirst({
-        where: {
-          productId: compositeId,
-          transactionType: 'REVERT_WRITE_OFF',
-          revertedFromId: writeOffTransactionId,
-        },
-      });
-
-      if (existingRevert) {
+      if (await findRevert(compositeId, writeOffTransactionId)) {
         return NextResponse.json(
           { success: false, error: 'This write-off has already been reverted' },
           { status: 400 }
@@ -537,38 +357,24 @@ export async function PATCH(
 
       const quantityToRestore = writeOffTransaction.quantity;
       const newQty = existingProduct.currentQty + quantityToRestore;
+      const activeStatus =
+        existingProduct.status?.name === 'Sold Out' ? await findStatusByName('Active') : null;
 
-      let statusUpdate = {};
-      if (existingProduct.status?.name === 'Sold Out') {
-        const activeStatus = await getActiveStatus();
-        if (activeStatus) {
-          statusUpdate = { statusId: activeStatus.id };
-        }
-      }
-
-      await prisma.$transaction([
-        prisma.inventoryTransaction.create({
-          data: {
-            productId: compositeId,
-            transactionType: 'REVERT_WRITE_OFF',
-            transactionDate: new Date(),
-            quantity: quantityToRestore,
-            unitCost: Number(writeOffTransaction.unitCost),
-            unitPrice: 0,
-            status: 'completed',
-            revertedFromId: writeOffTransactionId,
-            remainingQty: quantityToRestore,
-            notes: notes || `Reverted write-off #${writeOffTransactionId}`,
-          },
-        }),
-        prisma.product.update({
-          where: { compositeId },
-          data: {
-            currentQty: newQty,
-            ...statusUpdate,
-          },
-        }),
-      ]);
+      await recordMovement(
+        {
+          productId: compositeId,
+          transactionType: 'REVERT_WRITE_OFF',
+          transactionDate: new Date(),
+          quantity: quantityToRestore,
+          unitCost: writeOffTransaction.unitCost,
+          unitPrice: 0,
+          status: 'completed',
+          revertedFromId: writeOffTransactionId,
+          remainingQty: quantityToRestore,
+          notes: notes || `Reverted write-off #${writeOffTransactionId}`,
+        },
+        { currentQty: newQty, statusId: activeStatus?.id }
+      );
 
       return NextResponse.json({
         success: true,
@@ -587,45 +393,31 @@ export async function PATCH(
         );
       }
 
-      const finalCostPrice = costPrice !== undefined ? costPrice : await getLatestCostPrice(compositeId);
+      const finalCostPrice = costPrice !== undefined ? costPrice : await latestBatchCost(compositeId);
       const finalInvoiceDate = invoiceDate ? new Date(invoiceDate) : null;
       const transactionDate = finalInvoiceDate || new Date();
-      const retailPrice = await getRetailPrice(compositeId);
+      const retailPrice = await latestRetailPrice(compositeId);
 
       const newQty = existingProduct.currentQty + quantity;
+      const activeStatus =
+        existingProduct.status?.name === 'Sold Out' ? await findStatusByName('Active') : null;
 
-      let statusUpdate = {};
-      if (existingProduct.status?.name === 'Sold Out') {
-        const activeStatus = await getActiveStatus();
-        if (activeStatus) {
-          statusUpdate = { statusId: activeStatus.id };
-        }
-      }
-
-      await prisma.$transaction([
-        prisma.inventoryTransaction.create({
-          data: {
-            productId: compositeId,
-            transactionType: 'RESTOCK',
-            transactionDate,
-            invoiceDate: finalInvoiceDate,
-            quantity,
-            unitCost: finalCostPrice,
-            unitPrice: retailPrice,
-            status: 'completed',
-            remainingQty: quantity,
-            notes: notes || null,
-            isSpecialOrder: isSpecialOrder === true,
-          },
-        }),
-        prisma.product.update({
-          where: { compositeId },
-          data: {
-            currentQty: newQty,
-            ...statusUpdate,
-          },
-        }),
-      ]);
+      await recordMovement(
+        {
+          productId: compositeId,
+          transactionType: 'RESTOCK',
+          transactionDate,
+          invoiceDate: finalInvoiceDate,
+          quantity,
+          unitCost: finalCostPrice,
+          unitPrice: retailPrice,
+          status: 'completed',
+          remainingQty: quantity,
+          notes: notes || null,
+          isSpecialOrder: isSpecialOrder === true,
+        },
+        { currentQty: newQty, statusId: activeStatus?.id }
+      );
 
       return NextResponse.json({
         success: true,
@@ -644,9 +436,7 @@ export async function PATCH(
         );
       }
 
-      const newStatus = await prisma.frameStatus.findUnique({
-        where: { id: newStatusId },
-      });
+      const newStatus = await findStatus(newStatusId);
 
       if (!newStatus) {
         return NextResponse.json(
@@ -665,10 +455,7 @@ export async function PATCH(
         );
       }
 
-      await prisma.product.update({
-        where: { compositeId },
-        data: { statusId: newStatusId },
-      });
+      await setProductStatus(compositeId, newStatusId);
 
       return NextResponse.json({
         success: true,
@@ -677,28 +464,20 @@ export async function PATCH(
     }
 
     if (action === 'get_transactions') {
-      const revertTransactions = await prisma.inventoryTransaction.findMany({
-        where: {
-          productId: compositeId,
-          transactionType: 'REVERT_WRITE_OFF',
-        },
-        select: { revertedFromId: true },
-      });
-
-      const revertedIds = new Set(revertTransactions.map(t => t.revertedFromId).filter(Boolean));
+      const reverted = await revertedWriteOffIds(compositeId);
 
       const transactions = existingProduct.transactions.map(t => ({
         id: t.id,
         transactionType: t.transactionType,
         transactionDate: t.transactionDate.toISOString(),
         quantity: t.quantity,
-        unitCost: Number(t.unitCost),
-        unitPrice: Number(t.unitPrice),
+        unitCost: t.unitCost,
+        unitPrice: t.unitPrice,
         notes: t.notes,
         writeOffReason: t.writeOffReason,
         remainingQty: t.remainingQty,
         revertedFromId: t.revertedFromId,
-        isReverted: t.transactionType === 'WRITE_OFF' ? revertedIds.has(t.id) : undefined,
+        isReverted: t.transactionType === 'WRITE_OFF' ? reverted.has(t.id) : undefined,
       }));
 
       return NextResponse.json({
@@ -713,12 +492,9 @@ export async function PATCH(
       );
 
       if (orderTransaction) {
-        await prisma.inventoryTransaction.update({
-          where: { id: orderTransaction.id },
-          data: {
-            notes: 'DISCONTINUED',
-            status: 'discontinued',
-          },
+        await updateTransaction(orderTransaction.id, {
+          notes: 'DISCONTINUED',
+          status: 'discontinued',
         });
       }
 

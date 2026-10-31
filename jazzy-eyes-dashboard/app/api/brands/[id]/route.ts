@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import {
+  brandExists,
+  createBrand,
+  deleteBrand,
+  findBrandWithProductCount,
+  updateBrand,
+} from '@/db/brands';
 import { updateBrandSchema } from '@/lib/validations/admin';
 
 export async function GET(
@@ -17,14 +23,7 @@ export async function GET(
       );
     }
 
-    const brand = await prisma.brand.findUnique({
-      where: { id: brandId },
-      include: {
-        _count: {
-          select: { products: true },
-        },
-      },
-    });
+    const brand = await findBrandWithProductCount(brandId);
 
     if (!brand) {
       return NextResponse.json(
@@ -41,7 +40,7 @@ export async function GET(
         companyName: brand.companyName,
         companyId: brand.companyId,
         allocationQuantity: brand.allocationQuantity,
-        productCount: brand._count.products,
+        productCount: brand.productCount,
       },
     });
   } catch (error) {
@@ -78,14 +77,7 @@ export async function PUT(
       );
     }
 
-    const existingBrand = await prisma.brand.findUnique({
-      where: { id: brandId },
-      include: {
-        _count: {
-          select: { products: true },
-        },
-      },
-    });
+    const existingBrand = await findBrandWithProductCount(brandId);
 
     if (!existingBrand) {
       return NextResponse.json(
@@ -94,42 +86,34 @@ export async function PUT(
       );
     }
 
-    if (existingBrand._count.products > 0 && !body.confirmed) {
+    if (existingBrand.productCount > 0 && !body.confirmed) {
       return NextResponse.json(
         {
           success: false,
           requiresConfirmation: true,
-          productCount: existingBrand._count.products,
-          message: `This brand is used by ${existingBrand._count.products} product(s). Changes will affect all associated products. Are you sure you want to continue?`,
+          productCount: existingBrand.productCount,
+          message: `This brand is used by ${existingBrand.productCount} product(s). Changes will affect all associated products. Are you sure you want to continue?`,
         },
         { status: 409 }
       );
     }
 
     if (validation.data.id && validation.data.id !== brandId) {
-      const existingBrandWithNewId = await prisma.brand.findUnique({
-        where: { id: validation.data.id },
-      });
-
-      if (existingBrandWithNewId) {
+      if (await brandExists(validation.data.id)) {
         return NextResponse.json(
           { success: false, error: `Brand ID ${validation.data.id} already exists` },
           { status: 409 }
         );
       }
 
-      await prisma.brand.delete({
-        where: { id: brandId },
-      });
+      await deleteBrand(brandId);
 
-      const updatedBrand = await prisma.brand.create({
-        data: {
-          id: validation.data.id,
-          brandName: validation.data.brandName || existingBrand.brandName,
-          companyName: existingBrand.companyName,
-          companyId: existingBrand.companyId,
-          allocationQuantity: validation.data.allocationQuantity ?? existingBrand.allocationQuantity,
-        },
+      const updatedBrand = await createBrand({
+        id: validation.data.id,
+        brandName: validation.data.brandName || existingBrand.brandName,
+        companyName: existingBrand.companyName,
+        companyId: existingBrand.companyId,
+        allocationQuantity: validation.data.allocationQuantity ?? existingBrand.allocationQuantity,
       });
 
       return NextResponse.json({
@@ -145,10 +129,8 @@ export async function PUT(
       });
     }
 
-    const updatedBrand = await prisma.brand.update({
-      where: { id: brandId },
-      data: validation.data,
-    });
+    const { brandName, allocationQuantity } = validation.data;
+    const updatedBrand = await updateBrand(brandId, { brandName, allocationQuantity });
 
     return NextResponse.json({
       success: true,
@@ -185,14 +167,7 @@ export async function DELETE(
       );
     }
 
-    const existingBrand = await prisma.brand.findUnique({
-      where: { id: brandId },
-      include: {
-        _count: {
-          select: { products: true },
-        },
-      },
-    });
+    const existingBrand = await findBrandWithProductCount(brandId);
 
     if (!existingBrand) {
       return NextResponse.json(
@@ -201,19 +176,17 @@ export async function DELETE(
       );
     }
 
-    if (existingBrand._count.products > 0) {
+    if (existingBrand.productCount > 0) {
       return NextResponse.json(
         {
           success: false,
-          error: `Cannot delete brand "${existingBrand.brandName}" - it has ${existingBrand._count.products} product(s) associated with it. Please edit the brand instead or remove all products first.`,
+          error: `Cannot delete brand "${existingBrand.brandName}" - it has ${existingBrand.productCount} product(s) associated with it. Please edit the brand instead or remove all products first.`,
         },
         { status: 409 }
       );
     }
 
-    await prisma.brand.delete({
-      where: { id: brandId },
-    });
+    await deleteBrand(brandId);
 
     return NextResponse.json({
       success: true,
