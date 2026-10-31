@@ -1,0 +1,46 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    uses: ./.github/workflows/test.yml
+
+  deploy:
+    name: Cloud Build → jazzy-eyes
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    environment:
+      name: production
+      url: https://jazzy-eyes-1006405058436.us-east4.run.app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/1006405058436/locations/global/workloadIdentityPools/github-actions/providers/jazzy-eyes-production
+          service_account: jazzy-eyes-deploy@acuity-health-prod.iam.gserviceaccount.com
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Build, migrate, deploy
+        run: |
+          gcloud builds submit jazzy-eyes-dashboard \
+            --project=acuity-health-prod \
+            --region=us-east4 \
+            --config=jazzy-eyes-dashboard/cloudbuild.yaml \
+            --suppress-logs \
+            --service-account=projects/acuity-health-prod/serviceAccounts/jazzy-eyes-deploy@acuity-health-prod.iam.gserviceaccount.com \
+            --substitutions="_GIT_SHA=${GITHUB_SHA}"
