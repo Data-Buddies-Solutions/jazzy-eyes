@@ -31,9 +31,11 @@ export type RepRow = {
   ageBand: string;
   units: RepUnit[];
 };
+export type RxSale = { styleNumber: string; colorCode: string; eyeSize: string; saleDate: Date };
+export type RxRow = { model: string; color: string; size: string; sold: number; lastSold: string };
 export type RepReport = {
   brandName: string; startDate: string; endDate: string;
-  asOf: string; frames: RepRow[];
+  asOf: string; frames: RepRow[]; rxFrames: RxRow[];
 };
 export function reportToday(now: Date, timeZone: string): string {
   const parts = new Intl.DateTimeFormat('en-US', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now);
@@ -135,4 +137,19 @@ export function selectRepRows(rows: RepRow[], activityOnly = false): RepRow[] {
       || (b.daysOnShelf ?? -1) - (a.daysOnShelf ?? -1)
       || a.brand.localeCompare(b.brand) || a.model.localeCompare(b.model, 'en', { numeric: true })
       || a.frameId.localeCompare(b.frameId));
+}
+// RX sales have no inventory frame, so they are grouped by model, color and size as typed,
+// ignoring case and surrounding spaces. Each row shows the first spelling entered.
+export function buildRxRows(sales: RxSale[]): RxRow[] {
+  const rows = new Map<string, RxRow>();
+  for (const sale of sales) {
+    const [model, color, size] = [sale.styleNumber.trim(), sale.colorCode.trim(), sale.eyeSize.trim()];
+    const key = JSON.stringify([model, color, size].map(value => value.toUpperCase()));
+    const date = dateKey(sale.saleDate);
+    const row = rows.get(key);
+    if (row) { row.sold += 1; if (date > row.lastSold) row.lastSold = date; }
+    else rows.set(key, { model, color, size, sold: 1, lastSold: date });
+  }
+  return [...rows.values()].sort((a, b) => b.sold - a.sold || a.model.localeCompare(b.model, 'en', { numeric: true })
+    || a.color.localeCompare(b.color, 'en', { numeric: true }) || a.size.localeCompare(b.size, 'en', { numeric: true }));
 }

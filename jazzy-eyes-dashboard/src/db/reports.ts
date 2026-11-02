@@ -1,4 +1,4 @@
-import type { RepProduct } from '@/lib/reports/sales-rep'
+import type { RepProduct, RxSale } from '@/lib/reports/sales-rep'
 import { groupBy } from './group'
 import { db } from './pool'
 import { and, array, expression, raw, sql, type Sql } from './sql'
@@ -127,4 +127,13 @@ export async function repProducts(brandId: number, through: Date): Promise<RepPr
     (t) => t.productId
   )
   return productRows.map((product) => ({ ...product, transactions: transactions.get(product.compositeId) ?? [] }))
+}
+
+// The brand's RX sales dated within the period, oldest first.
+export function repRxSales(brandId: number, period: Period): Promise<RxSale[]> {
+  return db.rows(sql`
+    SELECT ${select(rxSales, ['styleNumber', 'colorCode', 'eyeSize', 'saleDate'])}
+    FROM rx_sales
+    WHERE ${and(sql`brand_id = ${brandId}`, within(raw('sale_date'), period))}
+    ORDER BY sale_date, id`)
 }

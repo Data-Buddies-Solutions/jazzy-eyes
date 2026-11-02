@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { findBrand, repProducts } from '@/db/reports';
-import { buildRepRow, parseReportDate, reportToday, selectRepRows } from '@/lib/reports/sales-rep';
+import { findBrand, repProducts, repRxSales } from '@/db/reports';
+import { buildRepRow, buildRxRows, parseReportDate, reportToday, selectRepRows } from '@/lib/reports/sales-rep';
 
 export async function GET(request: NextRequest) {
   if (request.cookies.get('jazzy-eyes-session')?.value !== 'authenticated') {
@@ -25,7 +25,8 @@ export async function GET(request: NextRequest) {
     const startDate = start.toISOString().slice(0, 10), endDate = end.toISOString().slice(0, 10);
     const products = await repProducts(brandId, new Date(`${asOf}T23:59:59.999Z`));
     const frames = selectRepRows(products.map(product => buildRepRow(product, brand.brandName, startDate, endDate, asOf)));
-    return NextResponse.json({ success: true, brandName: brand.brandName, startDate, endDate, asOf, frames },
+    const rxFrames = buildRxRows(await repRxSales(brandId, { start, end }));
+    return NextResponse.json({ success: true, brandName: brand.brandName, startDate, endDate, asOf, frames, rxFrames },
     { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error) {
     console.error('Error fetching sales rep report:', error);

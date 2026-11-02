@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Loader2, Printer, FileText, PackageCheck } from 'lucide-react';
+import { DISPLAY_STATUSES, type DisplayStatus } from '@/lib/reports/inventory';
 
 interface Brand {
   id: number;
@@ -25,7 +26,7 @@ interface Frame {
   frameType: string;
   productType: string;
   status: string;
-  displayStatus: 'Active' | 'Sold Out' | 'Discontinued' | 'Returned';
+  displayStatus: DisplayStatus;
   statusColorScheme: string;
   beginningQty: number;
   added: number;
@@ -86,6 +87,7 @@ export default function InventoryReportPage() {
   const [selectedBrandId, setSelectedBrandId] = useState<string>('');
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState<string>(String(currentYear));
+  const [selectedStatuses, setSelectedStatuses] = useState<DisplayStatus[]>([...DISPLAY_STATUSES]);
   const [report, setReport] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(false);
   const [brandsLoading, setBrandsLoading] = useState(true);
@@ -113,11 +115,13 @@ export default function InventoryReportPage() {
 
   useEffect(() => {
     if (specialOrdersMode) return;
-    if (!selectedBrandId) {
+    if (!selectedBrandId || selectedStatuses.length === 0) {
       setReport(null);
       return;
     }
 
+    // A newer selection replaces this request; its late response must not overwrite the newer report.
+    let current = true;
     const fetchReport = async () => {
       setLoading(true);
       setError(null);
@@ -125,24 +129,29 @@ export default function InventoryReportPage() {
         const yearNum = parseInt(selectedYear);
         const startDate = new Date(yearNum, 0, 1).toISOString();
         const endDate = new Date(yearNum, 11, 31, 23, 59, 59).toISOString();
-        const response = await fetch(
-          `/api/reports/inventory?brandId=${selectedBrandId}&startDate=${startDate}&endDate=${endDate}`
-        );
+        const params = new URLSearchParams({ brandId: selectedBrandId, startDate, endDate });
+        for (const status of selectedStatuses) params.append('status', status);
+        const response = await fetch(`/api/reports/inventory?${params}`);
         const data = await response.json();
+        if (!current) return;
         if (data.success) {
           setReport(data);
         } else {
           setError(data.error || 'Failed to fetch report');
         }
       } catch (err) {
+        if (!current) return;
         setError('Failed to fetch report');
         console.error('Error fetching report:', err);
       } finally {
-        setLoading(false);
+        if (current) setLoading(false);
       }
     };
     fetchReport();
-  }, [selectedBrandId, specialOrdersMode, selectedYear]);
+    return () => {
+      current = false;
+    };
+  }, [selectedBrandId, specialOrdersMode, selectedYear, selectedStatuses]);
 
   const fetchSpecialOrders = useCallback(async (brandId?: string) => {
     setSpecialOrdersLoading(true);
@@ -191,6 +200,15 @@ export default function InventoryReportPage() {
       currency: 'USD',
     }).format(value);
   };
+
+  const toggleStatus = (status: DisplayStatus) => {
+    setSelectedStatuses((current) =>
+      current.includes(status)
+        ? current.filter((s) => s !== status)
+        : DISPLAY_STATUSES.filter((s) => s === status || current.includes(s))
+    );
+  };
+  const statusesFiltered = selectedStatuses.length < DISPLAY_STATUSES.length;
 
   const isLoading = loading || specialOrdersLoading;
   const selectedBrandName = brands.find(
@@ -363,6 +381,29 @@ export default function InventoryReportPage() {
           </div>
         </div>
 
+        {!specialOrdersMode && (
+          <fieldset className="no-print flex flex-wrap items-center gap-4 text-sm">
+            <legend className="sr-only">Statuses to include</legend>
+            <span className="font-semibold">Show:</span>
+            {DISPLAY_STATUSES.map((status) => (
+              <label key={status} className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={selectedStatuses.includes(status)}
+                  onChange={() => toggleStatus(status)}
+                />
+                {status}
+              </label>
+            ))}
+          </fieldset>
+        )}
+
+        {!specialOrdersMode && selectedBrandId && selectedStatuses.length === 0 && (
+          <Card className="no-print p-8 border-2 border-black text-center text-gray-600">
+            Select at least one status to run the report.
+          </Card>
+        )}
+
         {isLoading && (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin" />
@@ -529,6 +570,9 @@ export default function InventoryReportPage() {
               <h2 className="text-xl font-semibold mt-1">
                 Inventory Report — {report.brandName} — {selectedYear}
               </h2>
+              {statusesFiltered && (
+                <p className="text-sm font-semibold mt-1">Statuses: {selectedStatuses.join(', ')}</p>
+              )}
               <p className="text-sm text-gray-500 mt-1">
                 Generated:{' '}
                 {new Date().toLocaleDateString('en-US', {
@@ -718,6 +762,7 @@ export default function InventoryReportPage() {
             <h3 className="text-lg font-semibold">No Frames Found</h3>
             <p className="text-gray-600">
               No inventory found for {report.brandName}
+              {statusesFiltered ? ` with status ${selectedStatuses.join(', ')}` : ''}
             </p>
           </Card>
         )}

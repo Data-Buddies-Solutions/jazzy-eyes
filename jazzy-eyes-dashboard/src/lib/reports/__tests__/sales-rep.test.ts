@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildRepRow, parseReportDate, reportToday, selectRepRows, type RepTransaction } from '../sales-rep';
+import { buildRepRow, buildRxRows, parseReportDate, reportToday, selectRepRows, type RepTransaction } from '../sales-rep';
 const t = (id: number, type: string, date: string, quantity = 1, extra = {}): RepTransaction => ({ id, transactionType: type, transactionDate: new Date(date), quantity, status: 'completed', revertedFromId: null, ...extra });
 const row = (transactions: RepTransaction[], qty = 1, model = '100') => buildRepRow({ compositeId: `1-${model}-001-52`, brandId: 1, styleNumber: model, colorCode: '001', eyeSize: '52', currentQty: qty, transactions }, 'Gucci', '2026-09-01', '2026-09-30', '2026-10-03');
 describe('sales rep report', () => {
@@ -77,5 +77,23 @@ describe('sales rep report', () => {
   it('validates date-only inputs including impossible dates', () => {
     for (const input of [null, '', '2026-02-30', '2026-13-01', '2026-1-01', 'invalid']) expect(parseReportDate(input)).toBeNull();
     expect(parseReportDate('2026-09-30')?.toISOString()).toBe('2026-09-30T00:00:00.000Z');
+  });
+  it('groups RX sales by model, color and size, most sold first', () => {
+    const rx = (model: string, color: string, date: string, size = '52') => ({ styleNumber: model, colorCode: color, eyeSize: size, saleDate: new Date(`${date}T00:00:00.000Z`) });
+    expect(buildRxRows([
+      rx('GG10', '001', '2026-09-03'), rx('GG2', '001', '2026-09-05'), rx('GG10', '001', '2026-09-01'),
+      rx('GG10', '002', '2026-09-02'), rx('GG10', '001', '2026-09-04', '54'),
+    ])).toEqual([
+      { model: 'GG10', color: '001', size: '52', sold: 2, lastSold: '2026-09-03' },
+      { model: 'GG2', color: '001', size: '52', sold: 1, lastSold: '2026-09-05' },
+      { model: 'GG10', color: '001', size: '54', sold: 1, lastSold: '2026-09-04' },
+      { model: 'GG10', color: '002', size: '52', sold: 1, lastSold: '2026-09-02' },
+    ]);
+    expect(buildRxRows([])).toEqual([]);
+  });
+  it('groups RX entries that differ only in case or surrounding spaces', () => {
+    const rx = (model: string, color: string, date: string) => ({ styleNumber: model, colorCode: color, eyeSize: '53', saleDate: new Date(`${date}T00:00:00.000Z`) });
+    expect(buildRxRows([rx('KAHANA', '640-02', '2026-06-02'), rx(' Kahana', '640-02 ', '2026-06-03')]))
+      .toEqual([{ model: 'KAHANA', color: '640-02', size: '53', sold: 2, lastSold: '2026-06-03' }]);
   });
 });

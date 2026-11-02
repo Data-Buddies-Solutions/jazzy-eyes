@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { brandInventory, findBrand, specialOrders } from '@/db/reports';
+import { framesWithStatus, unknownStatus, type DisplayStatus } from '@/lib/reports/inventory';
 
 type InventoryTransactionForStatus = {
   transactionType: string;
@@ -10,7 +11,7 @@ function getDisplayStatus(
   currentQty: number,
   statusName: string | null,
   transactions: InventoryTransactionForStatus[]
-) {
+): DisplayStatus {
   if (currentQty === 0) {
     const depletionTransaction = [...transactions]
       .reverse()
@@ -45,10 +46,20 @@ export async function GET(request: NextRequest) {
     const brandId = searchParams.get('brandId');
     const startDateStr = searchParams.get('startDate');
     const endDateStr = searchParams.get('endDate');
+    // No status parameter means every status.
+    const statuses = searchParams.getAll('status');
 
     if (!brandId) {
       return NextResponse.json(
         { success: false, error: 'brandId is required' },
+        { status: 400 }
+      );
+    }
+
+    const unknown = unknownStatus(statuses);
+    if (unknown !== undefined) {
+      return NextResponse.json(
+        { success: false, error: `Unknown status: ${unknown}` },
         { status: 400 }
       );
     }
@@ -84,7 +95,7 @@ export async function GET(request: NextRequest) {
 
     const products = await brandInventory(brandIdNum);
 
-    const frames = products.map((p) => {
+    const allFrames = products.map((p) => {
       let beginningQty = 0;
       let added = 0;
       let returned = 0;
@@ -157,6 +168,7 @@ export async function GET(request: NextRequest) {
         inventoryValue: costPrice * p.currentQty,
       };
     });
+    const frames = framesWithStatus(allFrames, statuses);
 
     const summary = frames.reduce(
       (acc, f) => ({
