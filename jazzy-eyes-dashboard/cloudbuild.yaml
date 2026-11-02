@@ -62,5 +62,5 @@ steps:
       - --min-instances=0
       - --max-instances=2
       - --update-labels=commit-sha=${_GIT_SHA}
-      - --set-secrets=DATABASE_URL=jazzy-eyes-database-url:latest,ADMIN_EMAIL=jazzy-eyes-admin-email:latest,ADMIN_PASSWORD=jazzy-eyes-admin-password:latest
+      - --set-secrets=DATABASE_URL=jazzy-eyes-database-url:latest,ADMIN_EMAIL=jazzy-eyes-admin-email:latest,ADMIN_PASSWORD=jazzy-eyes-admin-password:latest,SESSION_SECRET=jazzy-eyes-session-secret:latest
     waitFor: [push, migrate]
