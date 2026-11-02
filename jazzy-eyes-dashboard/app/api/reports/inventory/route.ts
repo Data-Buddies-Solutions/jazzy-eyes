@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { brandInventory, findBrand, specialOrders } from '@/db/reports';
 
+const DISPLAY_STATUSES = ['Active', 'Sold Out', 'Returned', 'Discontinued'];
+
 type InventoryTransactionForStatus = {
   transactionType: string;
   writeOffReason: string | null;
@@ -45,10 +47,20 @@ export async function GET(request: NextRequest) {
     const brandId = searchParams.get('brandId');
     const startDateStr = searchParams.get('startDate');
     const endDateStr = searchParams.get('endDate');
+    // No status parameter means every status.
+    const statuses = searchParams.getAll('status');
 
     if (!brandId) {
       return NextResponse.json(
         { success: false, error: 'brandId is required' },
+        { status: 400 }
+      );
+    }
+
+    const unknownStatus = statuses.find((status) => !DISPLAY_STATUSES.includes(status));
+    if (unknownStatus !== undefined) {
+      return NextResponse.json(
+        { success: false, error: `Unknown status: ${unknownStatus}` },
         { status: 400 }
       );
     }
@@ -84,7 +96,7 @@ export async function GET(request: NextRequest) {
 
     const products = await brandInventory(brandIdNum);
 
-    const frames = products.map((p) => {
+    const allFrames = products.map((p) => {
       let beginningQty = 0;
       let added = 0;
       let returned = 0;
@@ -157,6 +169,9 @@ export async function GET(request: NextRequest) {
         inventoryValue: costPrice * p.currentQty,
       };
     });
+    const frames = statuses.length === 0
+      ? allFrames
+      : allFrames.filter((frame) => statuses.includes(frame.displayStatus));
 
     const summary = frames.reduce(
       (acc, f) => ({

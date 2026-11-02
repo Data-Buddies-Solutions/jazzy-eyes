@@ -35,6 +35,8 @@ export default function SalesRepReportPage() {
   const totals = rows.reduce((sum, row) => ({ stock: sum.stock + row.currentQty, received: sum.received + row.received,
     sold: sum.sold + row.sold, aged: sum.aged + (row.daysOnShelf !== null && row.daysOnShelf >= 90 ? 1 : 0) }),
   { stock: 0, received: 0, sold: 0, aged: 0 });
+  const rxRows = report?.rxFrames ?? [];
+  const rxSold = rxRows.reduce((sum, row) => sum + row.sold, 0);
   function clearReport() { setReport(null); setError(null); }
   async function generate(event: React.FormEvent) {
     event.preventDefault();
@@ -94,8 +96,8 @@ export default function SalesRepReportPage() {
         <p className="font-semibold">{report.brandName}</p>
         <p className="text-sm text-gray-600">Activity: {displayDate(report.startDate)} – {displayDate(report.endDate)} · Stock and shelf age as of {displayDate(report.asOf)}</p>
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">{[
-        ['Units in stock', totals.stock], ['Received in period', totals.received], ['Sold in period', totals.sold], ['Variants on shelf 90+ days', totals.aged],
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">{[
+        ['Units in stock', totals.stock], ['Received in period', totals.received], ['Sold in period', totals.sold], ['Rx sold in period', rxSold], ['Variants on shelf 90+ days', totals.aged],
       ].map(([label, value]) => <Card key={label} className="report-card border-2 border-black p-4"><p className="text-sm text-gray-600">{label}</p><p className="text-2xl font-bold">{value}</p></Card>)}</div>
       <Card className="report-card border-2 border-black p-4">
         <h3 className="font-bold mb-3">Frames ({rows.length})</h3>
@@ -122,7 +124,16 @@ export default function SalesRepReportPage() {
           </td></tr>}
           </Fragment>)}</tbody></table></div>}
       </Card>
-      <p className="text-xs text-gray-600">Received and sold counts apply to the selected dates, inclusive. Stock, shelf age, and last received/sold dates are current. Unit receipt dates are matched oldest-first from transaction history, not individual serial numbers. The summary age uses the oldest remaining unit; initial inventory uses its starting date. Unknown means the recorded history does not reconcile with current stock. Opening inventory is excluded from received counts. This report covers inventory frames, not separate prescription sales. Totals reflect the displayed rows.</p>
+      <Card className="report-card border-2 border-black p-4">
+        <h3 className="font-bold mb-3">Prescription sales ({rxRows.length})</h3>
+        {rxRows.length === 0 ? <p className="text-gray-600 py-6 text-center">No prescription sales during these dates.</p> : <div className="table-scroll overflow-x-auto"><table className="w-full text-sm text-left">
+          <thead><tr className="border-b-2 border-black">{['Brand', 'Model', 'Color', 'Size', 'Rx sold', 'Last sold'].map(label => <th scope="col" key={label} className="p-2 whitespace-nowrap">{label}</th>)}</tr></thead>
+          <tbody>{rxRows.map((row, index) => <tr key={`${row.model}|${row.color}|${row.size}`} className={index % 2 === 0 ? 'bg-gray-50' : ''}>
+            <td className="p-2">{report.brandName}</td><td className="p-2 font-semibold">{row.model}</td><td className="p-2">{row.color}</td><td className="p-2 whitespace-nowrap">{row.size}</td>
+            <td className="p-2 tabular-nums">{row.sold}</td><td className="p-2 whitespace-nowrap">{displayDate(row.lastSold)}</td>
+          </tr>)}</tbody></table></div>}
+      </Card>
+      <p className="text-xs text-gray-600">Received and sold counts apply to the selected dates, inclusive. Stock, shelf age, and last received/sold dates are current. Unit receipt dates are matched oldest-first from transaction history, not individual serial numbers. The summary age uses the oldest remaining unit; initial inventory uses its starting date. Unknown means the recorded history does not reconcile with current stock. Opening inventory is excluded from received counts. Prescription sales are entered under Sell Prescription and are not tied to inventory frames, so they are listed separately by model, color, and size as entered and do not change stock or shelf age. Frame totals reflect the displayed rows.</p>
     </>}
   </div>;
 }

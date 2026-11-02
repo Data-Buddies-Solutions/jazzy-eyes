@@ -7,6 +7,7 @@ import {
   brandInventory,
   findBrand,
   repProducts,
+  repRxSales,
   returnsInPeriod,
   rxSalesInPeriod,
   salesInPeriod,
@@ -127,6 +128,24 @@ describe('reports', () => {
       [1, 'Other', 300, 0],
     ])
     expect(ids(await allRxSalesEver())).toEqual([1, 2, 3])
+  })
+
+  it("selects one brand's RX sales within inclusive day boundaries, oldest first", async () => {
+    const rx = (brandId: number, style: string, date: string) =>
+      db.affected(sql`INSERT INTO rx_sales
+          (brand_id, style_number, color_code, eye_size, gender, frame_type, product_type, sale_date, sale_price, updated_at)
+        VALUES (${brandId}, ${style}, ${'BLK'}, ${'50'}, ${'Men'}, ${'Full Rim'}, ${'Optical'}, ${date}, ${300}, now())`)
+    await rx(1, 'LAST', '2026-09-30')
+    await rx(1, 'FIRST', '2026-09-01')
+    await rx(1, 'BEFORE', '2026-08-31')
+    await rx(1, 'AFTER', '2026-10-01')
+    await rx(2, 'OTHER', '2026-09-15')
+
+    const period = { start: new Date('2026-09-01T00:00:00.000Z'), end: new Date('2026-09-30T00:00:00.000Z') }
+    expect(await repRxSales(1, period)).toEqual([
+      { styleNumber: 'FIRST', colorCode: 'BLK', eyeSize: '50', saleDate: new Date('2026-09-01T00:00:00.000Z') },
+      { styleNumber: 'LAST', colorCode: 'BLK', eyeSize: '50', saleDate: new Date('2026-09-30T00:00:00.000Z') },
+    ])
   })
 
   it("lists a brand's products by composite id with status and every transaction oldest first", async () => {
