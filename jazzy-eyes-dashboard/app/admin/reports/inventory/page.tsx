@@ -11,8 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Loader2, Printer, FileText, PackageCheck } from 'lucide-react';
-
-const DISPLAY_STATUSES: Frame['displayStatus'][] = ['Active', 'Sold Out', 'Returned', 'Discontinued'];
+import { DISPLAY_STATUSES, type DisplayStatus } from '@/lib/reports/inventory';
 
 interface Brand {
   id: number;
@@ -27,7 +26,7 @@ interface Frame {
   frameType: string;
   productType: string;
   status: string;
-  displayStatus: 'Active' | 'Sold Out' | 'Discontinued' | 'Returned';
+  displayStatus: DisplayStatus;
   statusColorScheme: string;
   beginningQty: number;
   added: number;
@@ -88,7 +87,7 @@ export default function InventoryReportPage() {
   const [selectedBrandId, setSelectedBrandId] = useState<string>('');
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState<string>(String(currentYear));
-  const [selectedStatuses, setSelectedStatuses] = useState<Frame['displayStatus'][]>(DISPLAY_STATUSES);
+  const [selectedStatuses, setSelectedStatuses] = useState<DisplayStatus[]>([...DISPLAY_STATUSES]);
   const [report, setReport] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(false);
   const [brandsLoading, setBrandsLoading] = useState(true);
@@ -121,6 +120,8 @@ export default function InventoryReportPage() {
       return;
     }
 
+    // A newer selection replaces this request; its late response must not overwrite the newer report.
+    let current = true;
     const fetchReport = async () => {
       setLoading(true);
       setError(null);
@@ -132,19 +133,24 @@ export default function InventoryReportPage() {
         for (const status of selectedStatuses) params.append('status', status);
         const response = await fetch(`/api/reports/inventory?${params}`);
         const data = await response.json();
+        if (!current) return;
         if (data.success) {
           setReport(data);
         } else {
           setError(data.error || 'Failed to fetch report');
         }
       } catch (err) {
+        if (!current) return;
         setError('Failed to fetch report');
         console.error('Error fetching report:', err);
       } finally {
-        setLoading(false);
+        if (current) setLoading(false);
       }
     };
     fetchReport();
+    return () => {
+      current = false;
+    };
   }, [selectedBrandId, specialOrdersMode, selectedYear, selectedStatuses]);
 
   const fetchSpecialOrders = useCallback(async (brandId?: string) => {
@@ -195,7 +201,7 @@ export default function InventoryReportPage() {
     }).format(value);
   };
 
-  const toggleStatus = (status: Frame['displayStatus']) => {
+  const toggleStatus = (status: DisplayStatus) => {
     setSelectedStatuses((current) =>
       current.includes(status)
         ? current.filter((s) => s !== status)

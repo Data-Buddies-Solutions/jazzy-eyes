@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { brandInventory, findBrand, specialOrders } from '@/db/reports';
-
-const DISPLAY_STATUSES = ['Active', 'Sold Out', 'Returned', 'Discontinued'];
+import { framesWithStatus, unknownStatus, type DisplayStatus } from '@/lib/reports/inventory';
 
 type InventoryTransactionForStatus = {
   transactionType: string;
@@ -12,7 +11,7 @@ function getDisplayStatus(
   currentQty: number,
   statusName: string | null,
   transactions: InventoryTransactionForStatus[]
-) {
+): DisplayStatus {
   if (currentQty === 0) {
     const depletionTransaction = [...transactions]
       .reverse()
@@ -57,10 +56,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const unknownStatus = statuses.find((status) => !DISPLAY_STATUSES.includes(status));
-    if (unknownStatus !== undefined) {
+    const unknown = unknownStatus(statuses);
+    if (unknown !== undefined) {
       return NextResponse.json(
-        { success: false, error: `Unknown status: ${unknownStatus}` },
+        { success: false, error: `Unknown status: ${unknown}` },
         { status: 400 }
       );
     }
@@ -169,9 +168,7 @@ export async function GET(request: NextRequest) {
         inventoryValue: costPrice * p.currentQty,
       };
     });
-    const frames = statuses.length === 0
-      ? allFrames
-      : allFrames.filter((frame) => statuses.includes(frame.displayStatus));
+    const frames = framesWithStatus(allFrames, statuses);
 
     const summary = frames.reduce(
       (acc, f) => ({
