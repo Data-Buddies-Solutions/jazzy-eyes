@@ -3,9 +3,6 @@ import { findBrand, repProducts, repRxSales } from '@/db/reports';
 import { buildRepRow, buildRxRows, parseReportDate, reportToday, selectRepRows } from '@/lib/reports/sales-rep';
 
 export async function GET(request: NextRequest) {
-  if (request.cookies.get('jazzy-eyes-session')?.value !== 'authenticated') {
-    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-  }
   const params = request.nextUrl.searchParams;
   const brandId = Number(params.get('brandId'));
   const start = parseReportDate(params.get('startDate'));
