@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { discountedCost } from '@/lib/cost-discount';
 import { inStockProductRows, returnWriteOffRows, rxSaleRows, saleRows } from '@/db/analytics';
 import { calculateReturnCreditSummaries, type CreditLedgerEvent } from '@/lib/analytics/return-credits';
 
@@ -25,16 +26,7 @@ export async function GET(request: NextRequest) {
     let totalQtyOnHand = 0;
     let discontinuedInStock = 0;
     for (const p of products) {
-      let unitCost = p.latestOrderCost ?? 0;
-      if (
-        unitCost > 0 &&
-        p.costDiscountPercent &&
-        p.costDiscountPercent > 0 &&
-        p.costDiscountStartDate &&
-        new Date() >= p.costDiscountStartDate
-      ) {
-        unitCost = unitCost * (1 - p.costDiscountPercent / 100);
-      }
+      const unitCost = discountedCost(p.latestOrderCost ?? 0, p.latestOrderDate, p);
       totalInventoryValue += unitCost * p.currentQty;
       totalQtyOnHand += p.currentQty;
       if (p.statusName === 'Discontinued') {
@@ -68,15 +60,7 @@ export async function GET(request: NextRequest) {
     for (const s of allInventorySales) {
       let cogs = s.unitCost;
       if (cogs === 0 && s.latestOrderCost !== null) {
-        cogs = s.latestOrderCost;
-        if (
-          s.costDiscountPercent &&
-          s.costDiscountPercent > 0 &&
-          s.costDiscountStartDate &&
-          s.transactionDate >= s.costDiscountStartDate
-        ) {
-          cogs = cogs * (1 - s.costDiscountPercent / 100);
-        }
+        cogs = discountedCost(s.latestOrderCost, s.latestOrderDate, s);
       }
       if (cogs <= 0) continue;
       events.push({
@@ -124,18 +108,8 @@ export async function GET(request: NextRequest) {
 
 type ReturnWriteOff = Awaited<ReturnType<typeof returnWriteOffRows>>[number];
 
-// A return credits the product's latest order cost, discounted when the return falls
-// on or after the brand's discount start.
+// A return credits the product's latest order cost, discounted when that order was
+// received on or after the brand's discount start.
 function returnUnitCost(wo: ReturnWriteOff): number {
-  let unitCost = wo.latestOrderCost ?? 0;
-  if (
-    unitCost > 0 &&
-    wo.costDiscountPercent &&
-    wo.costDiscountPercent > 0 &&
-    wo.costDiscountStartDate &&
-    wo.transactionDate >= wo.costDiscountStartDate
-  ) {
-    unitCost = unitCost * (1 - wo.costDiscountPercent / 100);
-  }
-  return unitCost;
+  return discountedCost(wo.latestOrderCost ?? 0, wo.latestOrderDate, wo);
 }

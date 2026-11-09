@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { discountedCost } from '@/lib/cost-discount';
 import { brandsWithActivity } from '@/db/analytics';
 import type { BrandPerformanceResponse } from '@/types/analytics';
 
@@ -63,15 +64,7 @@ export async function GET(request: NextRequest) {
               (t) => t.transactionType === 'ORDER' || t.transactionType === 'RESTOCK'
             );
             if (orderTransaction) {
-              costPrice = orderTransaction.unitCost;
-              if (
-                brand.costDiscountPercent &&
-                brand.costDiscountPercent > 0 &&
-                brand.costDiscountStartDate &&
-                saleTransaction.transactionDate >= brand.costDiscountStartDate
-              ) {
-                costPrice = costPrice * (1 - brand.costDiscountPercent / 100);
-              }
+              costPrice = discountedCost(orderTransaction.unitCost, orderTransaction.transactionDate, brand);
             }
           }
           if (salePrice > 0 && costPrice > 0) {

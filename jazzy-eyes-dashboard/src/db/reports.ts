@@ -17,20 +17,21 @@ export function findBrand(id: number) {
   return db.one(sql`SELECT ${select(brands, ['id', 'brandName', 'companyName'])} FROM brands WHERE id = ${id}`)
 }
 
-// Unit cost of the product's most recent ORDER or RESTOCK, or null when it has none.
-const receivedUnitCost = expression<number | null>()(
-  'receivedUnitCost',
-  sql`SELECT r.unit_cost FROM inventory_transactions r
+// Unit cost and date of the product's most recent ORDER or RESTOCK, or null when it has none.
+function latestReceipt(column: string) {
+  return sql`SELECT ${raw(`r.${column}`)} FROM inventory_transactions r
     WHERE r.product_id = t.product_id AND r.transaction_type = ANY(${array(['ORDER', 'RESTOCK'], '"TransactionType"')})
     ORDER BY r.transaction_date DESC, r.id DESC LIMIT 1`
-)
+}
+const receivedUnitCost = expression<number | null>()('receivedUnitCost', latestReceipt('unit_cost'))
+const receivedDate = expression<Date | null>()('receivedDate', latestReceipt('transaction_date'))
 
 function costedTransactions(kind: Sql, period: Period | null, order: Sql) {
   return db.rows(sql`
     SELECT ${select(inventoryTransactions, ['id', 'transactionDate', 'quantity', 'unitCost', 'unitPrice'], { alias: 't' })},
       ${select(products, ['styleNumber', 'colorCode', 'eyeSize', 'gender', 'frameType', 'productType'], { alias: 'p' })},
       ${select(brands, ['brandName', 'costDiscountPercent', 'costDiscountStartDate'], { alias: 'b' })},
-      ${receivedUnitCost}
+      ${receivedUnitCost}, ${receivedDate}
     FROM inventory_transactions t
     JOIN products p ON p.composite_id = t.product_id
     JOIN brands b ON b.id = p.brand_id

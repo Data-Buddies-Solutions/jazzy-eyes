@@ -1,3 +1,4 @@
+import { discountedCost } from '@/lib/cost-discount'
 import { groupBy } from './group'
 import { db } from './pool'
 import { and, array, expression, or, raw, sql, type Sql } from './sql'
@@ -29,7 +30,6 @@ const statusSummary = expression<StatusSummary | null>()(
 const product = selectAll(products, { alias: 'p' })
 const transaction = selectAll(inventoryTransactions)
 const newestFirst = raw('transaction_date DESC, id DESC')
-const oldestFirst = raw('transaction_date ASC, id ASC')
 
 async function withTransactions<P extends Product>(
   rows: P[],
@@ -176,18 +176,6 @@ export function findStatusByName(name: string): Promise<FrameStatus | null> {
   return db.one(sql`SELECT ${selectAll(frameStatuses)} FROM frame_statuses WHERE name = ${name}`)
 }
 
-// Applies the brand's cost discount when the sale falls on or after the discount's start date.
-export async function discountedCost(brandId: number, cost: number, saleDate: Date): Promise<number> {
-  const brand = await db.one(
-    sql`SELECT ${select(brands, ['costDiscountPercent', 'costDiscountStartDate'])} FROM brands WHERE id = ${brandId}`
-  )
-  const percent = brand?.costDiscountPercent ?? 0
-  if (percent > 0 && brand?.costDiscountStartDate && saleDate >= brand.costDiscountStartDate) {
-    return cost * (1 - percent / 100)
-  }
-  return cost
-}
-
 export async function findTransaction(id: number): Promise<InventoryTransaction | null> {
   return db.one(sql`SELECT ${transaction} FROM inventory_transactions WHERE id = ${integer(id, 'transaction id')}`)
 }
@@ -267,12 +255,18 @@ export async function recordMovement(
   })
 }
 
-function fifoBatches(productId: string): Promise<InventoryTransaction[]> {
-  return db.rows(
-    sql`SELECT ${transaction} FROM inventory_transactions
-        WHERE product_id = ${productId} AND transaction_type IN ('ORDER', 'RESTOCK') AND remaining_qty > 0
-        ORDER BY ${oldestFirst}`
+// Open ORDER and RESTOCK batches oldest first, each costed with the brand discount for its receive date.
+async function fifoBatches(productId: string) {
+  const batches = await db.rows(
+    sql`SELECT ${selectAll(inventoryTransactions, { alias: 't' })},
+          ${select(brands, ['costDiscountPercent', 'costDiscountStartDate'], { alias: 'b' })}
+        FROM inventory_transactions t
+        JOIN products p ON p.composite_id = t.product_id
+        JOIN brands b ON b.id = p.brand_id
+        WHERE t.product_id = ${productId} AND t.transaction_type IN ('ORDER', 'RESTOCK') AND t.remaining_qty > 0
+        ORDER BY t.transaction_date ASC, t.id ASC`
   )
+  return batches.map((batch) => ({ ...batch, unitCost: discountedCost(batch.unitCost, batch.transactionDate, batch) }))
 }
 
 // Average unit cost of the oldest batches that would cover the quantity, without consuming them.
