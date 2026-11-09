@@ -50,10 +50,10 @@ describe('saleRows', () => {
     await seed()
 
     expect(await saleRows()).toEqual([
-      { id: 4, productId: '1-B', transactionDate: day('2026-09-30'), quantity: 1, unitCost: 0, unitPrice: 260, productType: 'Sun', ...zetaCost, latestOrderCost: 95.25 },
-      { id: 5, productId: '1-B', transactionDate: day('2026-09-10'), quantity: 1, unitCost: 90, unitPrice: 249.99, productType: 'Sun', ...zetaCost, latestOrderCost: 95.25 },
-      { id: 6, productId: '1-A', transactionDate: day('2026-09-20'), quantity: 1, unitCost: 0, unitPrice: 199, productType: 'Optical', ...zetaCost, latestOrderCost: null },
-      { id: 7, productId: '2-A', transactionDate: day('2026-10-01'), quantity: 1, unitCost: 0, unitPrice: 120, productType: 'Optical', brandName: 'Alpha', costDiscountPercent: null, costDiscountStartDate: null, latestOrderCost: null },
+      { id: 4, productId: '1-B', transactionDate: day('2026-09-30'), quantity: 1, unitCost: 0, unitPrice: 260, productType: 'Sun', ...zetaCost, latestOrderCost: 95.25, latestOrderDate: day('2026-09-05') },
+      { id: 5, productId: '1-B', transactionDate: day('2026-09-10'), quantity: 1, unitCost: 90, unitPrice: 249.99, productType: 'Sun', ...zetaCost, latestOrderCost: 95.25, latestOrderDate: day('2026-09-05') },
+      { id: 6, productId: '1-A', transactionDate: day('2026-09-20'), quantity: 1, unitCost: 0, unitPrice: 199, productType: 'Optical', ...zetaCost, latestOrderCost: null, latestOrderDate: null },
+      { id: 7, productId: '2-A', transactionDate: day('2026-10-01'), quantity: 1, unitCost: 0, unitPrice: 120, productType: 'Optical', brandName: 'Alpha', costDiscountPercent: null, costDiscountStartDate: null, latestOrderCost: null, latestOrderDate: null },
     ])
   })
 
@@ -82,8 +82,8 @@ describe('returnWriteOffRows', () => {
     await seed()
 
     expect(await returnWriteOffRows()).toEqual([
-      { id: 8, transactionDate: day('2026-09-15'), quantity: 1, ...zetaCost, latestOrderCost: 95.25 },
-      { id: 10, transactionDate: day('2026-08-15'), quantity: 2, brandName: 'Alpha', costDiscountPercent: null, costDiscountStartDate: null, latestOrderCost: null },
+      { id: 8, transactionDate: day('2026-09-15'), quantity: 1, ...zetaCost, latestOrderCost: 95.25, latestOrderDate: day('2026-09-05') },
+      { id: 10, transactionDate: day('2026-08-15'), quantity: 2, brandName: 'Alpha', costDiscountPercent: null, costDiscountStartDate: null, latestOrderCost: null, latestOrderDate: null },
     ])
     expect((await returnWriteOffRows(range('2026-09-01', '2026-09-30'))).map((row) => row.id)).toEqual([8])
   })
@@ -108,8 +108,8 @@ describe('inStockProductRows', () => {
     await seed()
 
     expect(await inStockProductRows()).toEqual([
-      { compositeId: '1-B', currentQty: 2, statusName: 'Active', ...zetaCost, latestOrderCost: 95.25 },
-      { compositeId: '2-A', currentQty: 1, statusName: null, brandName: 'Alpha', costDiscountPercent: null, costDiscountStartDate: null, latestOrderCost: null },
+      { compositeId: '1-B', currentQty: 2, statusName: 'Active', ...zetaCost, latestOrderCost: 95.25, latestOrderDate: day('2026-09-05') },
+      { compositeId: '2-A', currentQty: 1, statusName: null, brandName: 'Alpha', costDiscountPercent: null, costDiscountStartDate: null, latestOrderCost: null, latestOrderDate: null },
     ])
   })
 })

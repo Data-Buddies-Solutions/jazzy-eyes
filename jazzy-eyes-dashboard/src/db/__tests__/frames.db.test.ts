@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import {
   consumeFifo,
   createFrame,
-  discountedCost,
   findFrame,
   findProduct,
   findProductWithStatus,
@@ -237,14 +236,14 @@ describe('stock movements', () => {
     const older = await addTransaction('1-AB1-BLK-50', 'ORDER', '2026-01-01', { unitCost: 100, remainingQty: 1 })
     await addTransaction('1-AB1-BLK-50', 'REVERT_WRITE_OFF', '2025-01-01', { unitCost: 1, remainingQty: 5 })
 
-    expect(await previewFifoCost('1-AB1-BLK-50', 2)).toBe(115)
+    expect(await previewFifoCost('1-AB1-BLK-50', 2)).toBe(108.5)
     expect(await remaining()).toEqual([
       { id: newer, remainingQty: 2 },
       { id: older, remainingQty: 1 },
       { id: older + 1, remainingQty: 5 },
     ])
 
-    expect(await consumeFifo('1-AB1-BLK-50', 2)).toBe(115)
+    expect(await consumeFifo('1-AB1-BLK-50', 2)).toBe(108.5)
     expect(await remaining()).toEqual([
       { id: newer, remainingQty: 1 },
       { id: older, remainingQty: 0 },
@@ -269,14 +268,21 @@ describe('stock movements', () => {
   })
 })
 
-describe('discountedCost', () => {
-  it('discounts on and after the start date only', async () => {
-    expect(await discountedCost(1, 100, day('2026-09-01'))).toBe(90)
-    expect(await discountedCost(1, 100, day('2026-08-31'))).toBe(100)
+describe('FIFO cost discount', () => {
+  it("discounts each batch received on or after the brand's start date, whenever it sells", async () => {
+    await addProduct('1-AB1-BLK-50', { currentQty: 2 })
+    await addTransaction('1-AB1-BLK-50', 'ORDER', '2026-08-31', { unitCost: 100, remainingQty: 1 })
+    await addTransaction('1-AB1-BLK-50', 'RESTOCK', '2026-09-01', { unitCost: 100, remainingQty: 1 })
+    expect(await previewFifoCost('1-AB1-BLK-50', 1)).toBe(100)
+    expect(await previewFifoCost('1-AB1-BLK-50', 2)).toBe(95)
+    expect(await consumeFifo('1-AB1-BLK-50', 1)).toBe(100)
+    expect(await consumeFifo('1-AB1-BLK-50', 1)).toBe(90)
   })
 
-  it('leaves the cost alone for a brand without a discount', async () => {
-    expect(await discountedCost(2, 100, day('2026-10-01'))).toBe(100)
+  it('leaves batches alone for a brand without a discount', async () => {
+    await addProduct('2-AB1-BLK-50', { brandId: 2 })
+    await addTransaction('2-AB1-BLK-50', 'ORDER', '2026-10-01', { unitCost: 100, remainingQty: 1 })
+    expect(await consumeFifo('2-AB1-BLK-50', 1)).toBe(100)
   })
 })
 

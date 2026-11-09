@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { discountedCost } from '@/lib/cost-discount';
 import { allReturnsEver, allRxSalesEver, allSalesEver, returnsInPeriod, rxSalesInPeriod, salesInPeriod } from '@/db/reports';
 import { calculateReturnCreditSummaries, type CreditLedgerEvent } from '@/lib/analytics/return-credits';
 
@@ -25,15 +26,7 @@ export async function GET(request: NextRequest) {
     const formattedInventorySales = inventorySales.map((sale) => {
       let unitCost = sale.unitCost;
       if (unitCost === 0 && sale.receivedUnitCost !== null) {
-        unitCost = sale.receivedUnitCost;
-        if (
-          sale.costDiscountPercent &&
-          sale.costDiscountPercent > 0 &&
-          sale.costDiscountStartDate &&
-          sale.transactionDate >= sale.costDiscountStartDate
-        ) {
-          unitCost = unitCost * (1 - sale.costDiscountPercent / 100);
-        }
+        unitCost = discountedCost(sale.receivedUnitCost, sale.receivedDate, sale);
       }
 
       return {
@@ -120,16 +113,7 @@ export async function GET(request: NextRequest) {
     const returnRows: ReturnRow[] = [];
     const returnsByBrand: Record<string, { units: number; creditValue: number }> = {};
     for (const r of returnsInMonth) {
-      let unitCost = r.receivedUnitCost ?? 0;
-      if (
-        unitCost > 0 &&
-        r.costDiscountPercent &&
-        r.costDiscountPercent > 0 &&
-        r.costDiscountStartDate &&
-        r.transactionDate >= r.costDiscountStartDate
-      ) {
-        unitCost = unitCost * (1 - r.costDiscountPercent / 100);
-      }
+      const unitCost = discountedCost(r.receivedUnitCost ?? 0, r.receivedDate, r);
       const creditValue = unitCost * r.quantity;
       returnRows.push({
         brandName: r.brandName,
@@ -155,15 +139,7 @@ export async function GET(request: NextRequest) {
     for (const s of allInventorySales) {
       let cogs = s.unitCost;
       if (cogs === 0 && s.receivedUnitCost !== null) {
-        cogs = s.receivedUnitCost;
-        if (
-          s.costDiscountPercent &&
-          s.costDiscountPercent > 0 &&
-          s.costDiscountStartDate &&
-          s.transactionDate >= s.costDiscountStartDate
-        ) {
-          cogs = cogs * (1 - s.costDiscountPercent / 100);
-        }
+        cogs = discountedCost(s.receivedUnitCost, s.receivedDate, s);
       }
       if (cogs <= 0) continue;
       creditEvents.push({
@@ -184,16 +160,7 @@ export async function GET(request: NextRequest) {
       });
     }
     for (const r of allReturnRows) {
-      let unitCost = r.receivedUnitCost ?? 0;
-      if (
-        unitCost > 0 &&
-        r.costDiscountPercent &&
-        r.costDiscountPercent > 0 &&
-        r.costDiscountStartDate &&
-        r.transactionDate >= r.costDiscountStartDate
-      ) {
-        unitCost = unitCost * (1 - r.costDiscountPercent / 100);
-      }
+      const unitCost = discountedCost(r.receivedUnitCost ?? 0, r.receivedDate, r);
       creditEvents.push({
         brandName: r.brandName,
         date: r.transactionDate,

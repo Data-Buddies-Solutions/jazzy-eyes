@@ -98,8 +98,9 @@ describe('reports', () => {
         costDiscountPercent: 10,
         costDiscountStartDate: new Date('2026-09-01T00:00:00.000Z'),
         receivedUnitCost: 80,
+        receivedDate: new Date('2026-02-10T00:00:00.000Z'),
       },
-      expect.objectContaining({ id: 5, brandName: 'Other', costDiscountPercent: null, receivedUnitCost: null }),
+      expect.objectContaining({ id: 5, brandName: 'Other', costDiscountPercent: null, receivedUnitCost: null, receivedDate: null }),
     ])
   })
 

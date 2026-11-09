@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   consumeFifo,
-  discountedCost,
   findFrame,
   findProduct,
   findProductWithStatus,
@@ -218,26 +217,14 @@ export async function PATCH(
 
       const previewCost = await previewFifoCost(compositeId, quantity);
 
-      const discountedPreviewCost = await discountedCost(
-        existingProduct.brandId,
-        previewCost,
-        finalSaleDate
-      );
-
-      if (discountedPreviewCost > 0 && finalSalePrice < discountedPreviewCost) {
+      if (previewCost > 0 && finalSalePrice < previewCost) {
         return NextResponse.json(
-          { success: false, error: `Sale price ($${finalSalePrice.toFixed(2)}) cannot be below wholesale cost ($${discountedPreviewCost.toFixed(2)})` },
+          { success: false, error: `Sale price ($${finalSalePrice.toFixed(2)}) cannot be below wholesale cost ($${previewCost.toFixed(2)})` },
           { status: 400 }
         );
       }
 
-      const avgCost = await consumeFifo(compositeId, quantity);
-
-      const finalUnitCost = await discountedCost(
-        existingProduct.brandId,
-        avgCost,
-        finalSaleDate
-      );
+      const finalUnitCost = await consumeFifo(compositeId, quantity);
 
       const newQty = existingProduct.currentQty - quantity;
       const soldOutStatus = newQty === 0 ? await findStatusByName('Sold Out') : null;

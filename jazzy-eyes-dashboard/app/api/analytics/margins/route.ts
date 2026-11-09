@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { discountedCost } from '@/lib/cost-discount';
 import { returnWriteOffRows, rxSaleRows, saleRows } from '@/db/analytics';
 import type { MarginsResponse } from '@/types/analytics';
 
@@ -45,15 +46,7 @@ export async function GET(request: NextRequest) {
       const revenue = saleTransaction.unitPrice;
       let cost = saleTransaction.unitCost;
       if (cost === 0 && saleTransaction.latestOrderCost !== null) {
-        cost = saleTransaction.latestOrderCost;
-        if (
-          saleTransaction.costDiscountPercent &&
-          saleTransaction.costDiscountPercent > 0 &&
-          saleTransaction.costDiscountStartDate &&
-          saleTransaction.transactionDate >= saleTransaction.costDiscountStartDate
-        ) {
-          cost = cost * (1 - saleTransaction.costDiscountPercent / 100);
-        }
+        cost = discountedCost(saleTransaction.latestOrderCost, saleTransaction.latestOrderDate, saleTransaction);
       }
 
       if (!brandMarginMap.has(brandName)) {
@@ -119,16 +112,7 @@ export async function GET(request: NextRequest) {
 
     const returnCreditsByBrand = new Map<string, number>();
     for (const r of returnWriteOffs) {
-      let unitCost = r.latestOrderCost ?? 0;
-      if (
-        unitCost > 0 &&
-        r.costDiscountPercent &&
-        r.costDiscountPercent > 0 &&
-        r.costDiscountStartDate &&
-        r.transactionDate >= r.costDiscountStartDate
-      ) {
-        unitCost = unitCost * (1 - r.costDiscountPercent / 100);
-      }
+      const unitCost = discountedCost(r.latestOrderCost ?? 0, r.latestOrderDate, r);
       returnCreditsByBrand.set(
         r.brandName,
         (returnCreditsByBrand.get(r.brandName) ?? 0) + unitCost * r.quantity

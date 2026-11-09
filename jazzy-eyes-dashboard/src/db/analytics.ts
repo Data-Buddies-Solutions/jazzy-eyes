@@ -21,15 +21,16 @@ const brandCost = select(brands, ['brandName', 'costDiscountPercent', 'costDisco
 
 const statusName = expression<string | null>()('statusName', sql`s.name`)
 
-// The unit cost of the product's latest ORDER or RESTOCK, or null when it has none.
+// The unit cost and date of the product's latest ORDER or RESTOCK, or null when it has none.
 // Callers fall back to this cost when a row carries none of its own.
-const latestOrderCost = expression<number | null>()(
-  'latestOrderCost',
-  sql`SELECT o.unit_cost FROM inventory_transactions o
+function latestOrder(column: string) {
+  return sql`SELECT ${raw(`o.${column}`)} FROM inventory_transactions o
     WHERE o.product_id = p.composite_id AND o.transaction_type IN ('ORDER', 'RESTOCK')
     ORDER BY o.transaction_date DESC, o.id DESC
     LIMIT 1`
-)
+}
+const latestOrderCost = expression<number | null>()('latestOrderCost', latestOrder('unit_cost'))
+const latestOrderDate = expression<Date | null>()('latestOrderDate', latestOrder('transaction_date'))
 
 export function saleRows(range?: DateRange, order: RowOrder = 'id') {
   return db.rows(sql`
@@ -37,7 +38,8 @@ export function saleRows(range?: DateRange, order: RowOrder = 'id') {
       ${select(inventoryTransactions, ['id', 'productId', 'transactionDate', 'quantity', 'unitCost', 'unitPrice'], { alias: 't' })},
       ${select(products, ['productType'], { alias: 'p' })},
       ${brandCost},
-      ${latestOrderCost}
+      ${latestOrderCost},
+      ${latestOrderDate}
     FROM inventory_transactions t
     JOIN products p ON p.composite_id = t.product_id
     JOIN brands b ON b.id = p.brand_id
@@ -50,7 +52,8 @@ export function returnWriteOffRows(range?: DateRange) {
     SELECT
       ${select(inventoryTransactions, ['id', 'transactionDate', 'quantity'], { alias: 't' })},
       ${brandCost},
-      ${latestOrderCost}
+      ${latestOrderCost},
+      ${latestOrderDate}
     FROM inventory_transactions t
     JOIN products p ON p.composite_id = t.product_id
     JOIN brands b ON b.id = p.brand_id
@@ -79,7 +82,8 @@ export function inStockProductRows() {
       ${select(products, ['compositeId', 'currentQty'], { alias: 'p' })},
       ${statusName},
       ${brandCost},
-      ${latestOrderCost}
+      ${latestOrderCost},
+      ${latestOrderDate}
     FROM products p
     JOIN brands b ON b.id = p.brand_id
     LEFT JOIN frame_statuses s ON s.id = p.status_id
