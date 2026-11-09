@@ -9,10 +9,10 @@ Cloud SQL unix socket.
 | ---------- | -------------------------------------------------------------------------------------------- |
 | URL        | https://jazzy-eyes-1006405058436.us-east4.run.app                                            |
 | Service    | `jazzy-eyes`, public via `--no-invoker-iam-check`, 0 to 2 instances                          |
-| Runtime SA | `jazzy-eyes@`: `roles/cloudsql.client`, `secretAccessor` on its three secrets                |
+| Runtime SA | `jazzy-eyes@`: `roles/cloudsql.client`, `secretAccessor` on its four secrets                 |
 | Deploy SA  | `jazzy-eyes-deploy@`: builds, migrates and deploys; GitHub signs in as it                    |
 | Database   | `jazzy_eyes`, login `jazzy_app`                                                              |
-| Secrets    | `jazzy-eyes-database-url`, `jazzy-eyes-admin-email`, `jazzy-eyes-admin-password`             |
+| Secrets    | `jazzy-eyes-database-url`, `jazzy-eyes-admin-email`, `jazzy-eyes-admin-password`, `jazzy-eyes-session-secret` |
 | Images     | `us-east4-docker.pkg.dev/acuity-health-prod/jazzy-eyes/jazzy-eyes`                           |
 
 ## How a deploy works
@@ -46,6 +46,13 @@ Add a version, then start a new revision so it is read:
 ```bash
 gcloud run services update jazzy-eyes --region=us-east4 --project=acuity-health-prod --update-secrets=ADMIN_PASSWORD=jazzy-eyes-admin-password:latest
 ```
+
+## Sessions
+
+Login sets a cookie signed with `SESSION_SECRET` (`src/lib/auth/session.ts`).
+`proxy.ts` requires it on every `/api` route except login and logout, and on
+`/admin` pages. Sessions last 30 days. To sign everyone out, add a new version
+of `jazzy-eyes-session-secret` and start a new revision as above.
 
 ## Connecting from a laptop
 
